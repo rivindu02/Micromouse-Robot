@@ -1,0 +1,8 @@
+../Core/Src/gyro.c:33:9:mpu9250_read_register	1
+../Core/Src/gyro.c:49:6:mpu9250_write_register	1
+../Core/Src/gyro.c:63:6:mpu9250_init	2
+../Core/Src/gyro.c:106:6:mpu9250_read_gyro	1
+../Core/Src/gyro.c:125:6:mpu9250_read_accel	1
+../Core/Src/gyro.c:144:6:mpu9250_read_all	1
+../Core/Src/gyro.c:153:7:mpu9250_get_gyro_z_dps	1
+../Core/Src/gyro.c:163:6:mpu9250_detect_turn	1

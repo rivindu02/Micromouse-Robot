@@ -1,0 +1,15 @@
+../Core/Src/micromouse.c:20:6:championship_micromouse_init	1
+../Core/Src/micromouse.c:52:6:initialize_championship_maze	5
+../Core/Src/micromouse.c:85:6:championship_flood_fill	13
+../Core/Src/micromouse.c:155:5:get_championship_direction	22
+../Core/Src/micromouse.c:220:6:championship_update_walls	16
+../Core/Src/micromouse.c:268:6:turn_to_direction	5
+../Core/Src/micromouse.c:289:6:championship_move_forward	2
+../Core/Src/micromouse.c:307:6:is_at_goal	8
+../Core/Src/micromouse.c:320:6:championship_exploration_with_analysis	22
+../Core/Src/micromouse.c:414:6:execute_championship_path_analysis	2
+../Core/Src/micromouse.c:441:6:reset_championship_micromouse	1
+../Core/Src/micromouse.c:461:6:championship_speed_run	1
+../Core/Src/micromouse.c:475:6:speed_run	16
+../Core/Src/micromouse.c:572:7:get_exploration_efficiency	4
+../Core/Src/micromouse.c:588:5:get_optimal_distance	1

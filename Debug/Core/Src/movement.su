@@ -1,0 +1,7 @@
+../Core/Src/movement.c:12:6:start_encoders	8	static
+../Core/Src/movement.c:28:6:move_forward	40	static
+../Core/Src/movement.c:77:6:turn_left	32	static
+../Core/Src/movement.c:109:6:turn_right	32	static
+../Core/Src/movement.c:141:6:turn_around	8	static
+../Core/Src/movement.c:150:6:stop_motors	8	static
+../Core/Src/movement.c:162:6:move_forward_distance	48	static

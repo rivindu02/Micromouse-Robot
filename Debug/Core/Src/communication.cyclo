@@ -1,0 +1,8 @@
+../Core/Src/communication.c:14:6:send_bluetooth_message	1
+../Core/Src/communication.c:22:6:send_bluetooth_printf	1
+../Core/Src/communication.c:36:6:send_maze_state	7
+../Core/Src/communication.c:66:6:send_sensor_data	1
+../Core/Src/communication.c:77:6:send_position_data	1
+../Core/Src/communication.c:89:6:send_performance_metrics	5
+../Core/Src/communication.c:115:6:send_battery_status	2
+../Core/Src/communication.c:132:6:send_championship_stats	1
