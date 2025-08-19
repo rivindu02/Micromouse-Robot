@@ -39,8 +39,8 @@ void Error_Handler(void);
 /* USER CODE END EFP */
 
 /* Private defines -----------------------------------------------------------*/
-#define Buildin_LED_Pin GPIO_PIN_13
-#define Buildin_LED_GPIO_Port GPIOC
+#define MOTOR_STBY_Pin GPIO_PIN_13
+#define MOTOR_STBY_GPIO_Port GPIOC
 #define Battery_Voltage_Pin GPIO_PIN_0
 #define Battery_Voltage_GPIO_Port GPIOA
 #define BTN_LEFT_Pin GPIO_PIN_1

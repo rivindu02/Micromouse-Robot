@@ -12,8 +12,9 @@
 #include "main.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include <string.h>
-#include <stdlib.h>
+#include <stdlib.h>  // For abs()
+#include <string.h>  // For memset()
+#include <math.h>    // For fabsf(), sqrtf()
 
 /* Maze configuration */
 #define MAZE_SIZE 16
@@ -74,9 +75,14 @@
 #define BTN_RIGHT_Pin GPIO_PIN_10
 #define BTN_RIGHT_GPIO_Port GPIOB
 
-#define GYRO_CS_Pin GPIO_PIN_2
-#define GYRO_CS_GPIO_Port GPIOD
+//#define GYRO_CS_Pin GPIO_PIN_2
+//#define GYRO_CS_GPIO_Port GPIOD
 
+#define GYRO_CS_Pin Chip_Select_Pin
+#define GYRO_CS_GPIO_Port Chip_Select_GPIO_Port
+
+
+bool are_sensors_healthy(void);
 /* Data structures */
 typedef struct {
     int distance;
@@ -137,6 +143,7 @@ extern ADC_HandleTypeDef hadc1;
 extern SPI_HandleTypeDef hspi2;
 extern TIM_HandleTypeDef htim1;
 extern TIM_HandleTypeDef htim2;  // Left encoder
+extern TIM_HandleTypeDef htim3;   /* TIM3 – motor PWM */
 extern TIM_HandleTypeDef htim4;  // Right encoder
 extern UART_HandleTypeDef huart6;
 
@@ -174,6 +181,7 @@ void turn_around(void);
 void stop_motors(void);
 void move_forward_distance(int distance_mm);
 void move_forward_adaptive_speed(float speed_multiplier);
+static void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin,bool forward, uint16_t duty);
 
 /* Sensor functions */
 void calibrate_sensors(void);
@@ -184,7 +192,7 @@ void turn_off_emitters(void);
 uint16_t read_adc_channel(uint32_t channel);
 
 /* Gyroscope functions */
-void mpu9250_init(void);
+bool mpu9250_init(void);
 void mpu9250_read_gyro(void);
 void mpu9250_read_accel(void);
 void mpu9250_read_all(void);
@@ -192,6 +200,9 @@ uint8_t mpu9250_read_register(uint8_t reg);
 void mpu9250_write_register(uint8_t reg, uint8_t data);
 float mpu9250_get_gyro_z_dps(void);
 bool mpu9250_detect_turn(void);
+void mpu9250_calibrate_bias(void);
+float mpu9250_get_gyro_z_compensated(void);
+
 
 /* Audio functions */
 void play_startup_tone(void);
@@ -245,5 +256,20 @@ void show_championship_distances(void);
 void speed_run(void);
 bool is_speed_run_ready(void);
 int get_speed_run_optimal_distance(void);
+
+/*GPIO External Interrupt Callback*/
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+
+void move_forward_adaptive_speed(float speed_multiplier);
+bool is_speed_run_ready(void);
+int get_speed_run_optimal_distance(void);
+bool mpu9250_is_initialized(void);
+void mpu9250_send_status(void);
+void send_encoder_status(void);
+
+/* Enhanced movement functions with S-curve */
+void move_forward_with_profile(float distance_mm, float max_speed);
+void move_forward_smooth(float distance_mm);
+
 
 #endif /* MICROMOUSE_H */
