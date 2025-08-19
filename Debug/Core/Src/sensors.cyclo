@@ -1,6 +1,7 @@
-../Core/Src/sensors.c:19:6:turn_on_emitters	1
-../Core/Src/sensors.c:31:6:turn_off_emitters	1
-../Core/Src/sensors.c:42:10:read_adc_channel	1
-../Core/Src/sensors.c:62:6:update_sensors	3
-../Core/Src/sensors.c:95:6:update_walls	16
-../Core/Src/sensors.c:136:6:calibrate_sensors	2
+../Core/Src/sensors.c:21:6:turn_on_emitters	1
+../Core/Src/sensors.c:33:6:turn_off_emitters	1
+../Core/Src/sensors.c:44:10:read_adc_channel	9
+../Core/Src/sensors.c:80:6:update_sensors	11
+../Core/Src/sensors.c:132:6:update_walls	16
+../Core/Src/sensors.c:173:6:are_sensors_healthy	1
+../Core/Src/sensors.c:183:6:calibrate_sensors	2

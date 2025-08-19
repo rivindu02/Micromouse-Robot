@@ -1,0 +1,4 @@
+../Core/Src/velocity_profile.c:11:6:velocity_profile_init	24	static
+../Core/Src/velocity_profile.c:21:6:velocity_profile_update	32	static
+../Core/Src/velocity_profile.c:45:7:velocity_profile_get_target_velocity	16	static
+../Core/Src/velocity_profile.c:49:6:velocity_profile_is_complete	16	static
