@@ -203,3 +203,5 @@ void performance_end_timer(const char* operation_name)
     uint32_t elapsed = HAL_GetTick() - perf_timer_start;
     send_bluetooth_printf("PERF: %s took %lu ms\r\n", operation_name, elapsed);
 }
+
+

@@ -13,6 +13,8 @@
 
 #include "micromouse.h"
 
+static uint8_t sensor_error_count = 0;
+static bool sensors_healthy = true;
 /**
  * @brief Turn on IR emitters
  */
@@ -37,24 +39,40 @@ void turn_off_emitters(void)
 }
 
 /**
- * @brief Read specific ADC channel
+ * @brief Read specific ADC channel using main.c multi-channel setup
  */
 uint16_t read_adc_channel(uint32_t channel)
 {
-    ADC_ChannelConfTypeDef sConfig = {0};
+    // Use the 5-channel continuous setup from main.c
+    uint32_t adc_values[5];
 
-    sConfig.Channel = channel;
-    sConfig.Rank = 1;
-    sConfig.SamplingTime = ADC_SAMPLETIME_15CYCLES;
-    HAL_ADC_ConfigChannel(&hadc1, &sConfig);
+    // Start continuous conversion of all 5 channels
+    if (HAL_ADC_Start(&hadc1) != HAL_OK) {
+        return 0; // Hardware error - return safe value
+    }
 
-    HAL_ADC_Start(&hadc1);
-    HAL_ADC_PollForConversion(&hadc1, 100);
-    uint16_t result = HAL_ADC_GetValue(&hadc1);
+    // Read all 5 channels in sequence (as configured in main.c)
+    for (int i = 0; i < 5; i++) {
+        if (HAL_ADC_PollForConversion(&hadc1, 50) != HAL_OK) {
+            HAL_ADC_Stop(&hadc1);
+            return 0; // Timeout error
+        }
+        adc_values[i] = HAL_ADC_GetValue(&hadc1);
+    }
+
     HAL_ADC_Stop(&hadc1);
 
-    return result;
+    // Return the correct channel value based on main.c rank order
+    switch (channel) {
+        case ADC_CHANNEL_0: return adc_values[0]; // Rank 1 - Battery
+        case ADC_CHANNEL_2: return adc_values[1]; // Rank 2 - Front Right
+        case ADC_CHANNEL_3: return adc_values[2]; // Rank 3 - Side Right
+        case ADC_CHANNEL_4: return adc_values[3]; // Rank 4 - Side Left
+        case ADC_CHANNEL_5: return adc_values[4]; // Rank 5 - Front Left
+        default: return 0;
+    }
 }
+
 
 /**
  * @brief Update all sensor readings
@@ -87,6 +105,25 @@ void update_sensors(void)
                          (sensors.front_right > WALL_THRESHOLD_FRONT);
     sensors.wall_left = (sensors.side_left > WALL_THRESHOLD_SIDE);
     sensors.wall_right = (sensors.side_right > WALL_THRESHOLD_SIDE);
+
+
+    // Check for sensor health
+    bool current_reading_valid = (sensors.battery > 100) && // Reasonable battery reading
+                               (sensors.front_left < 4000) && // Not maxed out
+                               (sensors.front_right < 4000) &&
+                               (sensors.side_left < 4000) &&
+                               (sensors.side_right < 4000);
+
+    if (!current_reading_valid) {
+        sensor_error_count++;
+        if (sensor_error_count > 5) {
+            sensors_healthy = false;
+            send_bluetooth_message("⚠️ WARNING: Sensor readings abnormal\r\n");
+            // Don't halt - allow robot to continue with degraded sensors
+        }
+    } else {
+        if (sensor_error_count > 0) sensor_error_count--; // Recover slowly
+    }
 }
 
 /**
@@ -129,6 +166,16 @@ void update_walls(void)
     maze[robot.x][robot.y].visited = true;
     maze[robot.x][robot.y].visit_count++;
 }
+
+/**
+ * @brief Check if sensors are healthy
+ */
+bool are_sensors_healthy(void)
+{
+    return sensors_healthy;
+}
+
+
 
 /**
  * @brief Calibrate sensors (placeholder for now)
