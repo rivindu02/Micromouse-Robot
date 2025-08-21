@@ -5242,30 +5242,30 @@ LOAD D:/ST/STM32CubeIDE_1.17.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.ext
  .text.mpu9250_is_initialized
                 0x08001cd4       0x18 ./Core/Src/gyro.o
                 0x08001cd4                mpu9250_is_initialized
- .text.main     0x08001cec      0x244 ./Core/Src/main.o
+ .text.main     0x08001cec      0x258 ./Core/Src/main.o
                 0x08001cec                main
  .text.SystemClock_Config
-                0x08001f30       0xd0 ./Core/Src/main.o
-                0x08001f30                SystemClock_Config
+                0x08001f44       0xd0 ./Core/Src/main.o
+                0x08001f44                SystemClock_Config
  .text.MX_ADC1_Init
-                0x08002000      0x114 ./Core/Src/main.o
+                0x08002014      0x114 ./Core/Src/main.o
  .text.MX_SPI2_Init
-                0x08002114       0x6c ./Core/Src/main.o
+                0x08002128       0x6c ./Core/Src/main.o
  .text.MX_TIM1_Init
-                0x08002180      0x140 ./Core/Src/main.o
+                0x08002194      0x140 ./Core/Src/main.o
  .text.MX_TIM2_Init
-                0x080022c0       0xa8 ./Core/Src/main.o
+                0x080022d4       0xa8 ./Core/Src/main.o
  .text.MX_TIM3_Init
-                0x08002368      0x130 ./Core/Src/main.o
+                0x0800237c      0x130 ./Core/Src/main.o
  .text.MX_TIM4_Init
-                0x08002498       0xa8 ./Core/Src/main.o
+                0x080024ac       0xa8 ./Core/Src/main.o
  .text.MX_USART6_UART_Init
-                0x08002540       0x54 ./Core/Src/main.o
+                0x08002554       0x54 ./Core/Src/main.o
  .text.MX_GPIO_Init
-                0x08002594      0x158 ./Core/Src/main.o
+                0x080025a8      0x158 ./Core/Src/main.o
  .text.HAL_GPIO_EXTI_Callback
-                0x080026ec       0x6c ./Core/Src/main.o
-                0x080026ec                HAL_GPIO_EXTI_Callback
+                0x08002700       0x58 ./Core/Src/main.o
+                0x08002700                HAL_GPIO_EXTI_Callback
  .text.Error_Handler
                 0x08002758       0x28 ./Core/Src/main.o
                 0x08002758                Error_Handler
@@ -5986,8 +5986,7 @@ LOAD D:/ST/STM32CubeIDE_1.17.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.ext
  *fill*         0x0800c89b        0x1 
  .rodata        0x0800c89c      0x42f ./Core/Src/gyro.o
  *fill*         0x0800cccb        0x1 
- .rodata        0x0800cccc      0x17f ./Core/Src/main.o
- *fill*         0x0800ce4b        0x1 
+ .rodata        0x0800cccc      0x180 ./Core/Src/main.o
  .rodata        0x0800ce4c      0x5ae ./Core/Src/micromouse.o
  *fill*         0x0800d3fa        0x2 
  .rodata        0x0800d3fc       0x5a ./Core/Src/movement.o
@@ -6706,32 +6705,32 @@ LOAD D:/ST/STM32CubeIDE_1.17.0/STM32CubeIDE/plugins/com.st.stm32cube.ide.mcu.ext
  .debug_macro   0x0001a678      0x200 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.o
  .debug_macro   0x0001a878      0x201 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
 
-.debug_line     0x00000000    0x1875c
+.debug_line     0x00000000    0x1875a
  .debug_line    0x00000000      0xa5e ./Core/Src/audio.o
  .debug_line    0x00000a5e      0xee7 ./Core/Src/championship_analysis.o
  .debug_line    0x00001945      0xb3c ./Core/Src/communication.o
  .debug_line    0x00002481      0xcc3 ./Core/Src/gyro.o
- .debug_line    0x00003144      0xebb ./Core/Src/main.o
- .debug_line    0x00003fff     0x1231 ./Core/Src/micromouse.o
- .debug_line    0x00005230      0xce8 ./Core/Src/movement.o
- .debug_line    0x00005f18      0xc25 ./Core/Src/sensors.o
- .debug_line    0x00006b3d      0x9e4 ./Core/Src/stm32f4xx_hal_msp.o
- .debug_line    0x00007521      0x8c0 ./Core/Src/stm32f4xx_it.o
- .debug_line    0x00007de1      0x8ac ./Core/Src/syscalls.o
- .debug_line    0x0000868d      0x588 ./Core/Src/sysmem.o
- .debug_line    0x00008c15      0x81a ./Core/Src/system_stm32f4xx.o
- .debug_line    0x0000942f      0xbfe ./Core/Src/utils.o
- .debug_line    0x0000a02d       0x7a ./Core/Startup/startup_stm32f411ceux.o
- .debug_line    0x0000a0a7      0xa96 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.o
- .debug_line    0x0000ab3d     0x11ed ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_adc.o
- .debug_line    0x0000bd2a      0xd66 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.o
- .debug_line    0x0000ca90     0x1002 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.o
- .debug_line    0x0000da92      0xbb2 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.o
- .debug_line    0x0000e644      0xea3 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.o
- .debug_line    0x0000f4e7     0x1d31 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.o
- .debug_line    0x00011218     0x35d5 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.o
- .debug_line    0x000147ed     0x1991 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.o
- .debug_line    0x0001617e     0x25de ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
+ .debug_line    0x00003144      0xeb9 ./Core/Src/main.o
+ .debug_line    0x00003ffd     0x1231 ./Core/Src/micromouse.o
+ .debug_line    0x0000522e      0xce8 ./Core/Src/movement.o
+ .debug_line    0x00005f16      0xc25 ./Core/Src/sensors.o
+ .debug_line    0x00006b3b      0x9e4 ./Core/Src/stm32f4xx_hal_msp.o
+ .debug_line    0x0000751f      0x8c0 ./Core/Src/stm32f4xx_it.o
+ .debug_line    0x00007ddf      0x8ac ./Core/Src/syscalls.o
+ .debug_line    0x0000868b      0x588 ./Core/Src/sysmem.o
+ .debug_line    0x00008c13      0x81a ./Core/Src/system_stm32f4xx.o
+ .debug_line    0x0000942d      0xbfe ./Core/Src/utils.o
+ .debug_line    0x0000a02b       0x7a ./Core/Startup/startup_stm32f411ceux.o
+ .debug_line    0x0000a0a5      0xa96 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal.o
+ .debug_line    0x0000ab3b     0x11ed ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_adc.o
+ .debug_line    0x0000bd28      0xd66 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_cortex.o
+ .debug_line    0x0000ca8e     0x1002 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_dma.o
+ .debug_line    0x0000da90      0xbb2 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_gpio.o
+ .debug_line    0x0000e642      0xea3 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_rcc.o
+ .debug_line    0x0000f4e5     0x1d31 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_spi.o
+ .debug_line    0x00011216     0x35d5 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim.o
+ .debug_line    0x000147eb     0x1991 ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_tim_ex.o
+ .debug_line    0x0001617c     0x25de ./Drivers/STM32F4xx_HAL_Driver/Src/stm32f4xx_hal_uart.o
 
 .debug_str      0x00000000    0x9fd35
  .debug_str     0x00000000    0x9fd35 ./Core/Src/audio.o

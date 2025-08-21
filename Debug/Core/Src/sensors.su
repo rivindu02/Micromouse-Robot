@@ -4,4 +4,4 @@
 ../Core/Src/sensors.c:80:6:update_sensors	24	static
 ../Core/Src/sensors.c:132:6:update_walls	40	static
 ../Core/Src/sensors.c:173:6:are_sensors_healthy	4	static
-../Core/Src/sensors.c:183:6:calibrate_sensors	16	static
+../Core/Src/sensors.c:181:6:calibrate_sensors	16	static

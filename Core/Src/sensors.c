@@ -175,8 +175,6 @@ bool are_sensors_healthy(void)
     return sensors_healthy;
 }
 
-
-
 /**
  * @brief Calibrate sensors (placeholder for now)
  */

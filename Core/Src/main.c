@@ -59,8 +59,9 @@ ADC_HandleTypeDef hadc1;
 SPI_HandleTypeDef hspi2;
 
 TIM_HandleTypeDef htim1;
-TIM_HandleTypeDef htim2;	// Left encoder
-TIM_HandleTypeDef htim4;   // Right encoder
+TIM_HandleTypeDef htim2;
+TIM_HandleTypeDef htim3;
+TIM_HandleTypeDef htim4;
 
 UART_HandleTypeDef huart6;
 
@@ -83,8 +84,11 @@ const int dx[4] = {0, 1, 0, -1}; // N, E, S, W
 const int dy[4] = {1, 0, -1, 0};
 
 /* Goal positions (center of maze) - DEFINITIONS */
-const int goal_x1 = 7, goal_y1 = 7;
-const int goal_x2 = 8, goal_y2 = 8;
+//const int goal_x1 = 7, goal_y1 = 7;
+//const int goal_x2 = 8, goal_y2 = 8;
+
+const int goal_x1 = (MAZE_SIZE/2 - 1), goal_y1 = (MAZE_SIZE/2 - 1);
+const int goal_x2 = (MAZE_SIZE/2), goal_y2 = (MAZE_SIZE/2);
 
 /* USER CODE END PV */
 
@@ -97,6 +101,7 @@ static void MX_TIM1_Init(void);
 static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_USART6_UART_Init(void);
+static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -141,13 +146,45 @@ int main(void)
   MX_TIM2_Init();
   MX_TIM4_Init();
   MX_USART6_UART_Init();
+  MX_TIM3_Init();
 
-  
+
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);   // PA6  (MOTOR_IN1)
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);   // PA7  (MOTOR_IN2)
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);   // PB0  (MOTOR_IN3)
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);   // PB1  (MOTOR_IN4)
+  HAL_GPIO_WritePin(MOTOR_STBY_GPIO_Port, MOTOR_STBY_Pin, GPIO_PIN_SET); // wake DRV8833
+
   /* USER CODE BEGIN 2 */
 
 
   /* Initialize micromouse system */
   championship_micromouse_init();
+
+
+  // Check gyro initialization
+  if (!mpu9250_is_initialized()) {
+      send_bluetooth_message("❌ CRITICAL: Gyroscope initialization failed!\r\n");
+
+  }
+
+  // Test ADC functionality
+  update_sensors();
+  if (sensors.battery == 0 && sensors.front_left == 0 &&
+      sensors.front_right == 0 && sensors.side_left == 0 && sensors.side_right == 0) {
+      send_bluetooth_message("❌ CRITICAL: All sensors reading zero - ADC failure!\r\n");
+  }
+
+  // Test encoder functionality
+  start_encoders();
+  HAL_Delay(10);
+  int32_t left_test = get_left_encoder_total();
+  int32_t right_test = get_right_encoder_total();
+  if (left_test == 0 && right_test == 0) {
+      send_bluetooth_message("⚠️ WARNING: Encoders may not be working\r\n");
+      // Don't mark as critical failure - encoders might be stationary
+  }
+
 
   /* Play startup tone */
   play_startup_tone();
@@ -204,6 +241,7 @@ int main(void)
 
 	  if (button_pressed == 1) {
 		  button_pressed = 0;
+		  send_bluetooth_message("Left button pressed\r\n");
 		  // Left button - start speed run or new exploration
 		  if (robot.center_reached && robot.returned_to_start) {
 			  championship_speed_run(); // Championship speed run with MMS path
@@ -216,6 +254,7 @@ int main(void)
 
 	  if (button_pressed == 2) {
 		  button_pressed = 0;
+		  send_bluetooth_message("Right button pressed\r\n");
 		  // Right button - reset system
 		  reset_championship_micromouse();
 		  send_bluetooth_message("Championship system reset\r\n");
@@ -398,7 +437,7 @@ static void MX_SPI2_Init(void)
   hspi2.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi2.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi2.Init.NSS = SPI_NSS_SOFT;
-  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_64;
+  hspi2.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_128;
   hspi2.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi2.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi2.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -460,7 +499,7 @@ static void MX_TIM1_Init(void)
     Error_Handler();
   }
   sConfigOC.OCMode = TIM_OCMODE_PWM1;
-  sConfigOC.Pulse = 500;
+  sConfigOC.Pulse = 100;
   sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
   sConfigOC.OCNPolarity = TIM_OCNPOLARITY_HIGH;
   sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
@@ -538,6 +577,77 @@ static void MX_TIM2_Init(void)
 }
 
 /**
+  * @brief TIM3 Initialization Function
+  * @param None
+  * @retval None
+  */
+static void MX_TIM3_Init(void)
+{
+
+  /* USER CODE BEGIN TIM3_Init 0 */
+
+  /* USER CODE END TIM3_Init 0 */
+
+  TIM_ClockConfigTypeDef sClockSourceConfig = {0};
+  TIM_MasterConfigTypeDef sMasterConfig = {0};
+  TIM_OC_InitTypeDef sConfigOC = {0};
+
+  /* USER CODE BEGIN TIM3_Init 1 */
+
+  /* USER CODE END TIM3_Init 1 */
+  htim3.Instance = TIM3;
+  htim3.Init.Prescaler = 4;
+  htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
+  htim3.Init.Period = 838;
+  htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
+  htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_ENABLE;
+  if (HAL_TIM_Base_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sClockSourceConfig.ClockSource = TIM_CLOCKSOURCE_INTERNAL;
+  if (HAL_TIM_ConfigClockSource(&htim3, &sClockSourceConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_Init(&htim3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sMasterConfig.MasterOutputTrigger = TIM_TRGO_RESET;
+  sMasterConfig.MasterSlaveMode = TIM_MASTERSLAVEMODE_DISABLE;
+  if (HAL_TIMEx_MasterConfigSynchronization(&htim3, &sMasterConfig) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  sConfigOC.OCMode = TIM_OCMODE_PWM1;
+  sConfigOC.Pulse = 0;
+  sConfigOC.OCPolarity = TIM_OCPOLARITY_HIGH;
+  sConfigOC.OCFastMode = TIM_OCFAST_DISABLE;
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_1) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_2) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_3) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  if (HAL_TIM_PWM_ConfigChannel(&htim3, &sConfigOC, TIM_CHANNEL_4) != HAL_OK)
+  {
+    Error_Handler();
+  }
+  /* USER CODE BEGIN TIM3_Init 2 */
+
+  /* USER CODE END TIM3_Init 2 */
+  HAL_TIM_MspPostInit(&htim3);
+
+}
+
+/**
   * @brief TIM4 Initialization Function
   * @param None
   * @retval None
@@ -602,7 +712,7 @@ static void MX_USART6_UART_Init(void)
 
   /* USER CODE END USART6_Init 1 */
   huart6.Instance = USART6;
-  huart6.Init.BaudRate = 115200;
+  huart6.Init.BaudRate = 9600;
   huart6.Init.WordLength = UART_WORDLENGTH_8B;
   huart6.Init.StopBits = UART_STOPBITS_1;
   huart6.Init.Parity = UART_PARITY_NONE;
@@ -637,21 +747,21 @@ static void MX_GPIO_Init(void)
   __HAL_RCC_GPIOB_CLK_ENABLE();
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(Buildin_LED_GPIO_Port, Buildin_LED_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(MOTOR_STBY_GPIO_Port, MOTOR_STBY_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, MOTOR_IN1_Pin|MOTOR_IN2_Pin|EMIT_FRONT_LEFT_Pin|EMIT_SIDE_LEFT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOB, Chip_Select_Pin|LED_LEFT_Pin|LED_RIGHT_Pin|EMIT_SIDE_RIGHT_Pin
+                          |EMIT_FRONT_RIGHT_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOB, MOTOR_IN3_Pin|MOTOR_IN4_Pin|Chip_Select_Pin|LED_LEFT_Pin
-                          |LED_RIGHT_Pin|EMIT_SIDE_RIGHT_Pin|EMIT_FRONT_RIGHT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, EMIT_FRONT_LEFT_Pin|EMIT_SIDE_LEFT_Pin, GPIO_PIN_RESET);
 
-  /*Configure GPIO pin : Buildin_LED_Pin */
-  GPIO_InitStruct.Pin = Buildin_LED_Pin;
+  /*Configure GPIO pin : MOTOR_STBY_Pin */
+  GPIO_InitStruct.Pin = MOTOR_STBY_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(Buildin_LED_GPIO_Port, &GPIO_InitStruct);
+  HAL_GPIO_Init(MOTOR_STBY_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pin : BTN_LEFT_Pin */
   GPIO_InitStruct.Pin = BTN_LEFT_Pin;
@@ -659,27 +769,27 @@ static void MX_GPIO_Init(void)
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BTN_LEFT_GPIO_Port, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : MOTOR_IN1_Pin MOTOR_IN2_Pin EMIT_FRONT_LEFT_Pin EMIT_SIDE_LEFT_Pin */
-  GPIO_InitStruct.Pin = MOTOR_IN1_Pin|MOTOR_IN2_Pin|EMIT_FRONT_LEFT_Pin|EMIT_SIDE_LEFT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-  /*Configure GPIO pins : MOTOR_IN3_Pin MOTOR_IN4_Pin Chip_Select_Pin LED_LEFT_Pin
-                           LED_RIGHT_Pin EMIT_SIDE_RIGHT_Pin EMIT_FRONT_RIGHT_Pin */
-  GPIO_InitStruct.Pin = MOTOR_IN3_Pin|MOTOR_IN4_Pin|Chip_Select_Pin|LED_LEFT_Pin
-                          |LED_RIGHT_Pin|EMIT_SIDE_RIGHT_Pin|EMIT_FRONT_RIGHT_Pin;
-  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-  GPIO_InitStruct.Pull = GPIO_NOPULL;
-  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
-
   /*Configure GPIO pin : BTN_RIGHT_Pin */
   GPIO_InitStruct.Pin = BTN_RIGHT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_IT_RISING;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   HAL_GPIO_Init(BTN_RIGHT_GPIO_Port, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : Chip_Select_Pin LED_LEFT_Pin LED_RIGHT_Pin EMIT_SIDE_RIGHT_Pin
+                           EMIT_FRONT_RIGHT_Pin */
+  GPIO_InitStruct.Pin = Chip_Select_Pin|LED_LEFT_Pin|LED_RIGHT_Pin|EMIT_SIDE_RIGHT_Pin
+                          |EMIT_FRONT_RIGHT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
+
+  /*Configure GPIO pins : EMIT_FRONT_LEFT_Pin EMIT_SIDE_LEFT_Pin */
+  GPIO_InitStruct.Pin = EMIT_FRONT_LEFT_Pin|EMIT_SIDE_LEFT_Pin;
+  GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
+  GPIO_InitStruct.Pull = GPIO_NOPULL;
+  GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
+  HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
   /* EXTI interrupt init*/
   HAL_NVIC_SetPriority(EXTI1_IRQn, 5, 0);
@@ -694,7 +804,24 @@ static void MX_GPIO_Init(void)
 }
 
 /* USER CODE BEGIN 4 */
+void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
+{
+    static uint32_t last_press = 0;
+    uint32_t current_time = HAL_GetTick();
 
+    // Debounce - ignore presses within 200ms
+    if ((current_time - last_press) > 200) {
+        if (GPIO_Pin == BTN_LEFT_Pin) {
+            button_pressed = 1;
+            start_flag = 1;  // Allow system to start
+            //send_bluetooth_message("Left button pressed\r\n");
+        } else if (GPIO_Pin == BTN_RIGHT_Pin) {
+            button_pressed = 2;
+            //send_bluetooth_message("Right button pressed\r\n");
+        }
+        last_press = current_time;
+    }
+}
 /* USER CODE END 4 */
 
 /**

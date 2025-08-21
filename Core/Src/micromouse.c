@@ -14,6 +14,9 @@
 extern int exploration_steps;
 extern int theoretical_minimum;
 
+
+
+
 /**
  * @brief Initialize championship micromouse system with MMS integration
  */
@@ -137,8 +140,13 @@ void championship_flood_fill(void)
                 // Update if we found a shorter path
                 if (new_dist < maze[nx][ny].distance) {
                     maze[nx][ny].distance = new_dist;
-                    queue_x[queue_tail] = nx;
-                    queue_y[queue_tail++] = ny;
+                    if (queue_tail < 255) {
+                        queue_x[queue_tail] = nx;
+                        queue_y[queue_tail++] = ny;
+                    } else {
+                        send_bluetooth_message("Queue overflow!\r\n");
+                        break;
+                    }
                     updates++;
                 }
             }
@@ -288,6 +296,7 @@ void turn_to_direction(int target_dir)
  */
 bool championship_move_forward(void)
 {
+    update_sensors();// neww
     // Check for wall before moving
     if (sensors.wall_front) {
         send_bluetooth_message("Front wall detected, cannot move\r\n");
@@ -494,7 +503,7 @@ void speed_run(void)
     play_confirmation_tone();
 
     // Wait for confirmation
-    send_bluetooth_message("Press RIGHT button to execute speed run...\r\n");
+    send_bluetooth_message("Press RIGHT button to execute speed run...\r\n"); //later change to hand movement
 
     uint32_t start_time = HAL_GetTick();
     bool execute_run = false;

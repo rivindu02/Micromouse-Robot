@@ -2,6 +2,8 @@
 
 # Championship Micromouse – Function Reference \& Debug Guide
 
+*Last Updated: August 19, 2025*
+
 This document explains the purpose of each module and key functions, and provides a step-by-step debugging workflow.
 
 ## 📁 Module \& Function Overview
@@ -37,6 +39,9 @@ This document explains the purpose of each module and key functions, and provide
 - Loop: update walls, flood fill, choose direction, turn, move forward
 - On center reached, switches to return mode, resets visit counts
 - After return, calls `execute_championship_path_analysis()`
+- **`championship_speed_run()`**
+- Executes high-speed optimal path run using explored maze data
+- Uses same flood fill + direction selection for maximum speed
 
 
 ### 3. championship_analysis.c
@@ -99,11 +104,26 @@ This document explains the purpose of each module and key functions, and provide
 - Helper routines: `map_value()`, `constrain_int()`, `performance_start_timer()`, etc.
 
 
-### 10. speed_run_simple.c
+### 10. velocity_profile.c
 
-- **`speed_run()`**
-- After exploration complete, follows `championship_flood_fill()` + `get_championship_direction()`
-- Moves robot along optimal path at maximum safe speed
+- **`velocity_profile_init()`**
+- Initializes velocity profile for smooth acceleration/deceleration
+- Sets maximum velocity, acceleration parameters, and distance targets
+- **`velocity_profile_update()`**
+- Updates current velocity based on trapezoidal motion profile
+- Handles acceleration, constant velocity, and deceleration phases
+- **`velocity_profile_get_target_velocity()`**
+- Returns current target velocity for motor control
+- **`velocity_profile_is_complete()`**
+- Checks if the velocity profile execution is finished
+
+### 11. state_machine.h
+
+- **State Management System**
+- Defines main micromouse states: IDLE, CALIBRATE, SEARCH_RUN, RETURN_TO_START, PREPARE_FAST, FAST_RUN, COMPLETE, ERROR
+- Movement execution states for various turn types and diagonal movements
+- Search behavior states for exploration strategies
+- Provides structured state management for complex micromouse operations
 
 
 ## 🐞 Debugging Workflow
@@ -138,7 +158,9 @@ This document explains the purpose of each module and key functions, and provide
     - Verify printed map matches expected visited cells
 7. **Speed Run**
     - After exploration, press left button again
-    - Logs from `speed_run()`—each move and final success
+    - Monitor velocity profile updates and state transitions
+    - Verify smooth acceleration/deceleration curves
+    - Check state machine transitions between movement states
 8. **IMU Verification**
     - Use `mpu9250_detect_turn()` prints to confirm gyro integration during turns
 
@@ -151,6 +173,24 @@ This document explains the purpose of each module and key functions, and provide
 - **Adjust Thresholds** in `micromouse.h` when false positives occur.
 
 You now have a complete function reference and structured debugging plan to validate every subsystem—from hardware to championship algorithms—and ensure reliability in international competition. Good luck!
+
+## 🔄 Recent Updates (August 19, 2025)
+
+### New Modules Added:
+- **`velocity_profile.h/.c`**: Advanced motion control with trapezoidal velocity profiling
+- **`state_machine.h`**: Comprehensive state management system for robust operation
+
+### Architecture Improvements:
+- **Enhanced Movement Control**: Smooth acceleration/deceleration curves for improved accuracy
+- **State-Based Design**: Structured state machine for complex behavior management
+- **Advanced Motion Planning**: Velocity profiling system for professional-grade movement
+- **Modular Expansion**: New modules support future advanced features like diagonal movement
+
+### Updated File Structure:
+- Velocity profiling integrated into movement system
+- State machine architecture for better code organization
+- Enhanced debugging capabilities with state monitoring
+- Improved documentation reflecting current implementation
 
 <div style="text-align: center">⁂</div>
 

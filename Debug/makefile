@@ -52,6 +52,12 @@ default.size.stdout \
 OBJDUMP_LIST += \
 Micromouse-Robot.list \
 
+OBJCOPY_HEX += \
+Micromouse-Robot.hex \
+
+OBJCOPY_BIN += \
+Micromouse-Robot.bin \
+
 
 # All Target
 all: main-build
@@ -75,12 +81,22 @@ Micromouse-Robot.list: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS
 	@echo 'Finished building: $@'
 	@echo ' '
 
+Micromouse-Robot.hex: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objcopy  -O ihex $(EXECUTABLES) "Micromouse-Robot.hex"
+	@echo 'Finished building: $@'
+	@echo ' '
+
+Micromouse-Robot.bin: $(EXECUTABLES) makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-objcopy  -O binary $(EXECUTABLES) "Micromouse-Robot.bin"
+	@echo 'Finished building: $@'
+	@echo ' '
+
 # Other Targets
 clean:
-	-$(RM) Micromouse-Robot.elf Micromouse-Robot.list Micromouse-Robot.map default.size.stdout
+	-$(RM) Micromouse-Robot.bin Micromouse-Robot.elf Micromouse-Robot.hex Micromouse-Robot.list Micromouse-Robot.map default.size.stdout
 	-@echo ' '
 
-secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST)
+secondary-outputs: $(SIZE_OUTPUT) $(OBJDUMP_LIST) $(OBJCOPY_HEX) $(OBJCOPY_BIN)
 
 fail-specified-linker-script-missing:
 	@echo 'Error: Cannot find the specified linker script. Check the linker settings in the build configuration.'

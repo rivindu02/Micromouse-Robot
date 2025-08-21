@@ -1,5 +1,7 @@
 # Micromouse Project v1.0
 
+*Last Updated: August 19, 2025*
+
 ## 🏆 Overview
 
 This is a championship-level micromouse implementation designed for **international competition standards**. Based on algorithms from world record holders and competition winners, this implementation provides:
@@ -47,7 +49,8 @@ Core/Inc/
   ├─ communication.h
   ├─ gyro.h
   ├─ utils.h
-  └─ speed_run.h
+  ├─ state_machine.h
+  └─ velocity_profile.h
 
 Core/Src/
   ├─ main.c                    // Hardware initialization & main loop
@@ -59,7 +62,7 @@ Core/Src/
   ├─ communication.c           // Bluetooth transmit functions
   ├─ gyro.c                    // MPU9250 IMU interface
   ├─ utils.c                   // Helper functions (mapping, constrain, etc.)
-  ├─ speed_run_simple.c        // `speed_run()` implementation for high‐speed run
+  ├─ velocity_profile.c        // Advanced velocity profiling for smooth movement
   ├─ stm32f4xx_hal_msp.c       // HAL MSP initialization
   ├─ stm32f4xx_it.c            // Interrupt handlers
   ├─ syscalls.c                // Newlib syscalls
@@ -91,6 +94,9 @@ Core/Src/
 - **Competition-specific optimizations** for time and power
 - **Real-time performance profiling** 
 - **Comprehensive error handling** and recovery
+- **Advanced velocity profiling** with trapezoidal motion control
+- **State machine architecture** for complex behavior management
+- **Smooth acceleration/deceleration** for improved accuracy
 
 ## 📊 Performance Metrics
 
@@ -182,9 +188,19 @@ The system provides detailed performance analysis:
 – `print_championship_distance_map()`: outputs distance map via Bluetooth
 – Visualization and diagnostics helpers
 
-### `speed_run_simple.c`
+### `velocity_profile.c`
 
-– `speed_run()`: uses same flood fill + direction selection to perform high-speed run along computed path, with user confirmation
+– `velocity_profile_init()`: initializes smooth motion profiles
+– `velocity_profile_update()`: updates target velocity using trapezoidal profile
+– `velocity_profile_get_target_velocity()`: returns current velocity target
+– Advanced acceleration/deceleration control for precise movement
+
+### `state_machine.h`
+
+– Defines comprehensive state management system
+– Main states: exploration, return, fast run, calibration
+– Movement states: forward, turns, diagonals, curves
+– Search behavior states for different exploration strategies
 
 ### `movement.c`
 
@@ -271,6 +287,8 @@ This implementation meets **IEEE Micromouse competition standards**:
 - **Comprehensive error handling** and logging
 - **Professional documentation** and code comments
 - **International coding standards** compliance
+- **Advanced state machine** for robust operation management
+- **Velocity profiling system** for smooth and precise movement
 
 ## 📈 Expected Competition Results
 

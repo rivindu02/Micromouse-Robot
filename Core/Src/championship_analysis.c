@@ -96,8 +96,13 @@ void calculate_optimal_path_from_explored_areas(void)
                 int new_dist = maze[x][y].distance + 1;
                 if (new_dist < maze[nx][ny].distance) {
                     maze[nx][ny].distance = new_dist;
-                    queue_x[queue_tail] = nx;
-                    queue_y[queue_tail++] = ny;
+                    if (queue_tail < 255) {
+                        queue_x[queue_tail] = nx;
+                        queue_y[queue_tail++] = ny;
+                    } else {
+                        send_bluetooth_message("Queue overflow!\r\n");
+                        break;
+                    }
                     updates++;
                 }
             }
@@ -234,7 +239,6 @@ void visualize_championship_optimal_path(void)
 
     // Trace optimal path from start to center using ONLY explored areas
     int x = 0, y = 0;
-
     if (!maze[x][y].visited) {
         send_bluetooth_message("❌ ERROR: Start position was not marked as visited!\r\n");
         return;
@@ -245,8 +249,31 @@ void visualize_championship_optimal_path(void)
     int path_steps = 0;
     int max_path_steps = theoretical_minimum + 5; // Safety limit
 
+    // FIXED: Add position tracking to prevent infinite loops
+    int last_positions[10] = {-1, -1, -1, -1, -1, -1, -1, -1, -1, -1};
+    int position_index = 0;
+    bool position_repeat_detected = false;
+
     while (!((x == goal_x1 || x == goal_x2) && (y == goal_y1 || y == goal_y2)) &&
-           path_steps < max_path_steps) {
+           path_steps < max_path_steps && !position_repeat_detected) {
+
+        // Check for position loops - FIXED: Infinite loop prevention
+        int current_position = x * MAZE_SIZE + y;
+        for (int i = 0; i < 10; i++) {
+            if (last_positions[i] == current_position) {
+                position_repeat_detected = true;
+                send_bluetooth_message(" -> POSITION LOOP DETECTED!\r\n");
+                break;
+            }
+        }
+
+        if (position_repeat_detected) {
+            break;
+        }
+
+        // Record current position
+        last_positions[position_index] = current_position;
+        position_index = (position_index + 1) % 10;
 
         int next_x = x, next_y = y;
         int min_dist = maze[x][y].distance;
@@ -259,7 +286,7 @@ void visualize_championship_optimal_path(void)
 
             // STRICT CHECKS: bounds, visited, no walls, better distance
             if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE &&
-                maze[nx][ny].visited &&  // Must be explored
+                maze[nx][ny].visited && // Must be explored
                 !maze[x][y].walls[dir] && // No wall from current cell
                 maze[nx][ny].distance < min_dist && // Better distance
                 maze[nx][ny].distance < MAX_DISTANCE) { // Valid distance
@@ -284,7 +311,7 @@ void visualize_championship_optimal_path(void)
                 if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE &&
                     maze[nx][ny].visited && !maze[x][y].walls[dir]) {
                     send_bluetooth_printf("dir%d->(%d,%d,d=%d,v=%d) ",
-                                         dir, nx, ny, maze[nx][ny].distance, maze[nx][ny].visited);
+                        dir, nx, ny, maze[nx][ny].distance, maze[nx][ny].visited);
                 }
             }
             send_bluetooth_message("\r\n");
@@ -295,7 +322,6 @@ void visualize_championship_optimal_path(void)
         x = next_x;
         y = next_y;
         path_steps++;
-
         send_bluetooth_printf(" -> (%d,%d)", x, y);
 
         // Flash LED to show path progress
@@ -309,6 +335,8 @@ void visualize_championship_optimal_path(void)
 
     if (path_steps >= max_path_steps) {
         send_bluetooth_message("⚠️ Path tracing stopped at safety limit\r\n");
+    } else if (position_repeat_detected) {
+        send_bluetooth_message("⚠️ Path tracing stopped due to position loop\r\n");
     } else if ((x == goal_x1 || x == goal_x2) && (y == goal_y1 || y == goal_y2)) {
         send_bluetooth_message("✅ Successfully traced optimal path to center!\r\n");
         play_confirmation_tone();
@@ -320,9 +348,10 @@ void visualize_championship_optimal_path(void)
 
     if (path_steps != theoretical_minimum) {
         send_bluetooth_printf("⚠️ Warning: Traced path (%d) differs from theoretical (%d)\r\n",
-                             path_steps, theoretical_minimum);
+            path_steps, theoretical_minimum);
     }
 }
+
 
 /**
  * @brief Show distance values for debugging (MMS style)
