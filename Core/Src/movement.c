@@ -16,6 +16,8 @@ static uint16_t last_right_count = 32768;
 static int32_t left_total = 0;
 static int32_t right_total = 0;
 
+//extern uint16_t current_left_raw;
+volatile uint16_t current_left_raw;
 /**
  * @brief Update encoder totals with proper overflow handling - NEW FUNCTION
  */
