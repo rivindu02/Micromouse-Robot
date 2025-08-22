@@ -1,0 +1,8 @@
+../Core/Src/enhanced_movement.c:29:6:move_forward_scurve	96	static
+../Core/Src/enhanced_movement.c:110:6:turn_scurve	88	static
+../Core/Src/enhanced_movement.c:218:6:move_forward_cell_scurve	8	static
+../Core/Src/enhanced_movement.c:225:6:turn_left_scurve	8	static
+../Core/Src/enhanced_movement.c:232:6:turn_right_scurve	8	static
+../Core/Src/enhanced_movement.c:239:6:turn_around_scurve	8	static
+../Core/Src/enhanced_movement.c:246:6:move_forward_adaptive_scurve	24	static
+../Core/Src/enhanced_movement.c:273:6:send_scurve_movement_status	8	static

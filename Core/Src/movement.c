@@ -3,11 +3,12 @@
  *
  * Implements precise movement using DRV8833 motor driver and encoders
  * FIXED: Proper encoder overflow handling and safe movement functions
+ * FIXED: Removed unused variables
  */
 
 #include "micromouse.h"
 #include "velocity_profile.h"
-#include <stdlib.h>  // for abs() function
+#include <stdlib.h> // for abs() function
 
 // FIXED: Add static variables for proper encoder overflow tracking
 static uint16_t last_left_count = 32768;
@@ -27,6 +28,9 @@ void update_encoder_totals(void)
     int16_t left_diff = current_left_raw - last_left_count;
     int16_t right_diff = current_right_raw - last_right_count;
 
+    // FIXED: Invert left encoder to match right encoder direction
+    left_diff = -left_diff;  // Make left encoder positive for forward movement
+
     // Update totals
     left_total += left_diff;
     right_total += right_diff;
@@ -39,8 +43,7 @@ void update_encoder_totals(void)
 /**
  * @brief Get safe left encoder total - NEW FUNCTION
  */
-int32_t get_left_encoder_total(void)
-{
+int32_t get_left_encoder_total(void) {
     update_encoder_totals();
     return left_total;
 }
@@ -48,8 +51,7 @@ int32_t get_left_encoder_total(void)
 /**
  * @brief Get safe right encoder total - NEW FUNCTION
  */
-int32_t get_right_encoder_total(void)
-{
+int32_t get_right_encoder_total(void) {
     update_encoder_totals();
     return right_total;
 }
@@ -57,8 +59,7 @@ int32_t get_right_encoder_total(void)
 /**
  * @brief Reset encoder totals - NEW FUNCTION
  */
-void reset_encoder_totals(void)
-{
+void reset_encoder_totals(void) {
     left_total = 0;
     right_total = 0;
     last_left_count = __HAL_TIM_GET_COUNTER(&htim2);
@@ -68,8 +69,7 @@ void reset_encoder_totals(void)
 /**
  * @brief Start encoder timers - FIXED VERSION
  */
-void start_encoders(void)
-{
+void start_encoders(void) {
     HAL_TIM_Encoder_Start(&htim4, TIM_CHANNEL_ALL); // Right encoder
     HAL_TIM_Encoder_Start(&htim2, TIM_CHANNEL_ALL); // Left encoder
 
@@ -77,12 +77,12 @@ void start_encoders(void)
     __HAL_TIM_SET_COUNTER(&htim4, 32768);
     __HAL_TIM_SET_COUNTER(&htim2, 32768);
 
+    HAL_Delay(1);
     // FIXED: Initialize our safe tracking variables
     last_left_count = 32768;
     last_right_count = 32768;
     left_total = 0;
     right_total = 0;
-
     encoders.left_total = 0;
     encoders.right_total = 0;
 }
@@ -90,8 +90,7 @@ void start_encoders(void)
 /**
  * @brief Move forward one cell - FIXED VERSION
  */
-void move_forward(void)
-{
+void move_forward(void) {
     // FIXED: Use safe encoder reading
     int32_t start_left = get_left_encoder_total();
     int32_t start_right = get_right_encoder_total();
@@ -106,12 +105,11 @@ void move_forward(void)
     }
 
     // Set motors to move forward
-    motor_set(TIM_CHANNEL_1, MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, true,  800); // left  ~80 %
-    motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, true,  800); // right ~80 %
+    motor_set(TIM_CHANNEL_1, MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, true, 800); // left ~80%
+    motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, true, 800); // right ~80%
 
     // Move until target distance reached
     int32_t target_counts = ENCODER_COUNTS_PER_CELL;
-
     while (1) {
         int32_t current_left = get_left_encoder_total();
         int32_t current_right = get_right_encoder_total();
@@ -122,7 +120,6 @@ void move_forward(void)
         if (avg_traveled >= target_counts) {
             break;
         }
-
         HAL_Delay(1);
     }
 
@@ -132,34 +129,28 @@ void move_forward(void)
     // FIXED: Update position only after successful movement
     robot.x = new_x;
     robot.y = new_y;
-
     HAL_Delay(100); // Settling time
 }
 
 /**
- * @brief Turn left 90 degrees - FIXED VERSION
+ * @brief Turn left 90 degrees - FIXED VERSION (removed unused variables)
  */
-void turn_left(void)
-{
-    // FIXED: Use safe encoder reading
-    int32_t start_left = get_left_encoder_total();
+void turn_left(void) {
+    // REMOVED: unused variable 'start_left'
     int32_t start_right = get_right_encoder_total();
 
     // Left motor backward, right motor forward
     motor_set(TIM_CHANNEL_1, MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, false, 800);
-    motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, true , 800);
-
+    motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, true, 800);
 
     int32_t target_counts = ENCODER_COUNTS_PER_TURN;
-
     while (1) {
         int32_t current_right = get_right_encoder_total();
-        int32_t right_traveled = abs(current_right - start_right); // FIXED: Use standard abs()
+        int32_t right_traveled = abs(current_right - start_right);
 
         if (right_traveled >= target_counts) {
             break;
         }
-
         HAL_Delay(1);
     }
 
@@ -169,29 +160,24 @@ void turn_left(void)
 }
 
 /**
- * @brief Turn right 90 degrees - FIXED VERSION
+ * @brief Turn right 90 degrees - FIXED VERSION (removed unused variables)
  */
-void turn_right(void)
-{
-    // FIXED: Use safe encoder reading
+void turn_right(void) {
     int32_t start_left = get_left_encoder_total();
-    int32_t start_right = get_right_encoder_total();
+    // REMOVED: unused variable 'start_right'
 
     // Left motor forward, right motor backward
-
     motor_set(TIM_CHANNEL_1, MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, true, 800);
-    motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, false , 800);
+    motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, false, 800);
 
     int32_t target_counts = ENCODER_COUNTS_PER_TURN;
-
     while (1) {
         int32_t current_left = get_left_encoder_total();
-        int32_t left_traveled = abs(current_left - start_left); // FIXED: Use standard abs()
+        int32_t left_traveled = abs(current_left - start_left);
 
         if (left_traveled >= target_counts) {
             break;
         }
-
         HAL_Delay(1);
     }
 
@@ -203,8 +189,7 @@ void turn_right(void)
 /**
  * @brief Turn around 180 degrees
  */
-void turn_around(void)
-{
+void turn_around(void) {
     turn_right();
     turn_right();
 }
@@ -212,8 +197,7 @@ void turn_around(void)
 /**
  * @brief Stop both motors
  */
-void stop_motors(void)
-{
+void stop_motors(void) {
     // Brake mode - both pins low
     motor_set(TIM_CHANNEL_1, MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, true, 0);
     motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, true, 0);
@@ -222,8 +206,7 @@ void stop_motors(void)
 /**
  * @brief Move forward a specific distance - FIXED VERSION
  */
-void move_forward_distance(int distance_mm)
-{
+void move_forward_distance(int distance_mm) {
     int32_t target_counts = (distance_mm * ENCODER_COUNTS_PER_CELL) / CELL_SIZE_MM;
 
     // FIXED: Use safe encoder reading
@@ -246,7 +229,6 @@ void move_forward_distance(int distance_mm)
         if (avg_traveled >= target_counts) {
             break;
         }
-
         HAL_Delay(1);
     }
 
@@ -267,11 +249,9 @@ bool is_speed_run_ready(void) {
     return (robot.center_reached && robot.returned_to_start);
 }
 
-
-
 // helper to set speed (0–1000 = 0–100%)
 void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin,
-                     bool forward, uint16_t duty) {
+               bool forward, uint16_t duty) {
     // Validate inputs
     if (duty > 1000) duty = 1000;
 
@@ -282,20 +262,15 @@ void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin,
     HAL_GPIO_WritePin(dirPort, dirPin, forward ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
-
-
-
 /**
  * @brief Get encoder status for debugging - NEW FUNCTION
  */
-void send_encoder_status(void)
-{
+void send_encoder_status(void) {
     update_encoder_totals();
     send_bluetooth_printf("Encoders - Left:%ld Right:%ld Raw_L:%d Raw_R:%d\r\n",
                          left_total, right_total,
                          __HAL_TIM_GET_COUNTER(&htim2), __HAL_TIM_GET_COUNTER(&htim4));
 }
-
 
 /**
  * @brief Move forward with S-curve velocity profile
@@ -312,13 +287,12 @@ void move_forward_with_profile(float distance_mm, float max_speed) {
 
     while (!velocity_profile_is_complete(&profile)) {
         velocity_profile_update(&profile);
-
         float target_vel = velocity_profile_get_target_velocity(&profile);
 
         // Convert mm/s to PWM duty (simple linear conversion)
         uint16_t duty = (uint16_t)(target_vel * 0.8f); // Scale factor to be tuned
         if (duty > 1000) duty = 1000; // Cap at max PWM
-        if (duty < 50) duty = 50;     // Minimum PWM for movement
+        if (duty < 50) duty = 50; // Minimum PWM for movement
 
         // Check distance traveled
         int32_t current_left = get_left_encoder_total();
@@ -345,8 +319,6 @@ void move_forward_with_profile(float distance_mm, float max_speed) {
 void move_forward_smooth(float distance_mm) {
     move_forward_with_profile(distance_mm, 600.0f); // 600 mm/s max speed
 }
-
-
 
 // Add to movement.c
 void debug_encoder_setup(void) {
@@ -378,7 +350,6 @@ void test_encoder_manual(void) {
     // Manual test - set counter values
     TIM2->CNT = 100;
     TIM4->CNT = 200;
-
     HAL_Delay(10);
 
     send_bluetooth_printf("TIM2 CNT: %d, TIM4 CNT: %d\r\n",
@@ -391,8 +362,8 @@ void test_encoder_rotation(void) {
     send_bluetooth_message("Manually rotate each wheel and watch the counts:\r\n");
 
     // Reset counters to known values
-    TIM2->CNT = 1000;  // Left encoder
-    TIM4->CNT = 2000;  // Right encoder
+    TIM2->CNT = 1000; // Left encoder
+    TIM4->CNT = 2000; // Right encoder
 
     send_bluetooth_message("Initial values set - TIM2: 1000, TIM4: 2000\r\n");
     send_bluetooth_message("Now manually rotate the wheels...\r\n");
@@ -406,10 +377,8 @@ void test_encoder_rotation(void) {
 
         send_bluetooth_printf("T+%ds: Raw L:%d R:%d | Total L:%ld R:%ld\r\n",
                              i/2, left_raw, right_raw, left_total, right_total);
-
         HAL_Delay(500);
     }
 
     send_bluetooth_message("Rotation test complete!\r\n");
 }
-

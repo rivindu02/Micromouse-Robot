@@ -177,13 +177,16 @@ int main(void)
 
   // Test encoder functionality
   start_encoders();
-  HAL_Delay(10);
   int32_t left_test = get_left_encoder_total();
   int32_t right_test = get_right_encoder_total();
+  HAL_Delay(100);
+
 
   debug_encoder_setup();
   test_encoder_manual();
   test_encoder_rotation();
+  left_test = get_left_encoder_total();
+  right_test = get_right_encoder_total();
 
   if (left_test == 0 && right_test == 0) {
       send_bluetooth_message("⚠️ WARNING: Encoders may not be working\r\n");

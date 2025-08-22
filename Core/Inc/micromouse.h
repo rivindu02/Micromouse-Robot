@@ -128,6 +128,31 @@ typedef struct {
     int32_t left_total;
     int32_t right_total;
 } EncoderData;
+typedef struct {
+    // Profile parameters
+    float max_velocity;        // mm/s - Maximum velocity
+    float max_acceleration;    // mm/s² - Maximum acceleration
+    float max_jerk;           // mm/s³ - Maximum jerk
+    float target_distance;    // mm - Target distance to travel
+
+    // Current state
+    float current_position;   // mm - Current position
+    float current_velocity;   // mm/s - Current velocity
+    float current_acceleration; // mm/s² - Current acceleration
+    float current_jerk;       // mm/s³ - Current jerk
+
+    // Time parameters
+    float t1, t2, t3, t4, t5, t6, t7; // 7-segment time durations
+    float total_time;         // Total profile time
+    uint32_t start_time;      // Profile start timestamp
+
+    // Status
+    bool profile_active;
+    bool profile_complete;
+    uint8_t current_segment;  // 1-7 for each S-curve segment
+} SCurveProfile;
+
+
 
 /* Global variables */
 extern MazeCell maze[MAZE_SIZE][MAZE_SIZE];
@@ -271,9 +296,17 @@ void debug_encoder_setup(void);
 void test_encoder_manual(void);
 void test_encoder_rotation(void);
 
-/* Enhanced movement functions with S-curve */
+/* Enhanced movement functions with Trapezoidal -curve */
 void move_forward_with_profile(float distance_mm, float max_speed);
 void move_forward_smooth(float distance_mm);
 
-
+/* enhanced_movement.c with s-curve */
+void move_forward_scurve(float distance_mm, float speed_multiplier);
+void turn_scurve(int turn_direction);
+void move_forward_cell_scurve(void);
+void turn_left_scurve(void);
+void turn_right_scurve(void);
+void turn_around_scurve(void);
+void move_forward_adaptive_scurve(float speed_multiplier);
+void send_scurve_movement_status(void);
 #endif /* MICROMOUSE_H */
