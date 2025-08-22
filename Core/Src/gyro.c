@@ -91,95 +91,61 @@ void mpu9250_write_register(uint8_t reg, uint8_t data)
 
 
 /**
- * @brief Initialize MPU9250 - FIXED VERSION with proper error handling and SPI setup
+ * @brief Corrected MPU9250 initialization with optimal settings
  */
-bool mpu9250_init(void)
-{
-    send_bluetooth_message("Initializing MPU9250...\r\n");
-
-    // FIXED: Check SPI speed - should be ≤ 1MHz for register operations
-    // Note: SPI2 is configured with BAUDRATEPRESCALER_64 in main.c
-    // This gives us: 84MHz / 64 = 1.3125MHz (slightly over 1MHz but should work)
-    // For production, change to BAUDRATEPRESCALER_128 for safer 656kHz
-    send_bluetooth_message("SPI speed: ~1.3MHz (register operations)\r\n");
-
-    // Wait for device to be ready
-    HAL_Delay(100);
-
-    // Check WHO_AM_I register
-    uint8_t who_am_i = mpu9250_read_register(MPU9250_WHO_AM_I);
-    if (who_am_i == MPU9250_WHO_AM_I_RESPONSE) {
-        send_bluetooth_message("MPU9250 detected successfully\r\n");
-    } else {
-        send_bluetooth_printf("MPU9250 detection failed! Got 0x%02X, expected 0x%02X\r\n",
-                             who_am_i, MPU9250_WHO_AM_I_RESPONSE);
-        mpu9250_initialized = false;
-        return false; // FIXED: Return boolean status instead of void
-    }
+bool mpu9250_init(void) {
+    send_bluetooth_message("Initializing MPU9250 (robust sequence)...\r\n");
+    HAL_Delay(200);
 
     // Reset device
-    mpu9250_write_register(MPU9250_PWR_MGMT_1, 0x80);
-    HAL_Delay(100);
+    mpu9250_write_register(MPU9250_PWR_MGMT_1, 0x80); // reset
+    HAL_Delay(250); // wait long after reset
 
-    // FIXED: Force SPI-only mode - disable I2C interface
-    // Set USER_CTRL.I2C_IF_DIS (bit 4) to prevent slipping back to I2C
-    uint8_t user_ctrl = mpu9250_read_register(MPU9250_USER_CTRL);
-    user_ctrl |= 0x10; // Set bit 4 (I2C_IF_DIS)
-    mpu9250_write_register(MPU9250_USER_CTRL, user_ctrl);
+    // Wake device (clear sleep)
+    mpu9250_write_register(MPU9250_PWR_MGMT_1, 0x00);
+    HAL_Delay(50);
+
+    // Select PLL with X axis as clock source (more stable)
+    mpu9250_write_register(MPU9250_PWR_MGMT_1, 0x01);
+    HAL_Delay(50);
+
+    // Enable all axes
+    mpu9250_write_register(MPU9250_PWR_MGMT_2, 0x00);
     HAL_Delay(10);
 
-    // Verify I2C is disabled
-    uint8_t user_ctrl_verify = mpu9250_read_register(MPU9250_USER_CTRL);
-    if (user_ctrl_verify & 0x10) {
-        send_bluetooth_message("✅ I2C interface disabled - SPI-only mode active\r\n");
-    } else {
-        send_bluetooth_message("⚠️ Warning: Failed to disable I2C interface\r\n");
+    // for disable I2C:
+     uint8_t user_ctrl = mpu9250_read_register(MPU9250_USER_CTRL);
+     user_ctrl |= 0x10; // I2C_IF_DIS
+     mpu9250_write_register(MPU9250_USER_CTRL, user_ctrl);
+     HAL_Delay(10);
+
+    // Sample rate: 1000/(1+div). For 200Hz use 4.
+    mpu9250_write_register(MPU9250_SMPLRT_DIV, 0x04);
+    HAL_Delay(10);
+
+    // CONFIG: DLPF (use value matching desired BW)
+    mpu9250_write_register(MPU9250_CONFIG, 0x02);
+    HAL_Delay(10);
+
+    // Gyro / Accel full scale
+    mpu9250_write_register(MPU9250_GYRO_CONFIG, 0x08);  // ±500 dps
+    HAL_Delay(10);
+    mpu9250_write_register(MPU9250_ACCEL_CONFIG, 0x08); // ±4g
+    HAL_Delay(10);
+    mpu9250_write_register(MPU9250_ACCEL_CONFIG_2, 0x02); // accel DLPF
+    HAL_Delay(10);
+
+    uint8_t who = mpu9250_read_register(MPU9250_WHO_AM_I);
+    send_bluetooth_printf("WHO_AM_I = 0x%02X\r\n", who);
+    if (who != MPU9250_WHO_AM_I_RESPONSE) {
+        send_bluetooth_printf("MPU9250 detection failed! Got 0x%02X\r\n", who);
+        mpu9250_initialized=false;
+        return false;
     }
 
-    // Configure power management
-    mpu9250_write_register(MPU9250_PWR_MGMT_1, 0x01); // Use PLL with X-axis gyro
-    HAL_Delay(10);
-    mpu9250_write_register(MPU9250_PWR_MGMT_2, 0x00); // Enable all axes
-    HAL_Delay(10);
-
-    // Configure sample rate (1kHz / (1 + SMPLRT_DIV))
-    mpu9250_write_register(MPU9250_SMPLRT_DIV, 0x07); // 125Hz sample rate
-    HAL_Delay(10);
-
-    // Configure low-pass filter
-    mpu9250_write_register(MPU9250_CONFIG, 0x03); // 41Hz bandwidth
-    HAL_Delay(10);
-
-    // Configure gyroscope (±500 dps)
-    mpu9250_write_register(MPU9250_GYRO_CONFIG, 0x08);
-    HAL_Delay(10);
-
-    // Configure accelerometer (±4g)
-    mpu9250_write_register(MPU9250_ACCEL_CONFIG, 0x08);
-    HAL_Delay(10);
-
-    // Configure accelerometer low-pass filter
-    mpu9250_write_register(MPU9250_ACCEL_CONFIG_2, 0x03);
-    HAL_Delay(10);
-
-    // FIXED: Verify configuration by reading back key registers
-    uint8_t pwr_mgmt_1 = mpu9250_read_register(MPU9250_PWR_MGMT_1);
-    uint8_t gyro_config = mpu9250_read_register(MPU9250_GYRO_CONFIG);
-    uint8_t accel_config = mpu9250_read_register(MPU9250_ACCEL_CONFIG);
-
-    send_bluetooth_printf("Configuration verify - PWR:0x%02X GYRO:0x%02X ACCEL:0x%02X\r\n",
-                         pwr_mgmt_1, gyro_config, accel_config);
-
-    // Check if configuration is correct
-    if (pwr_mgmt_1 == 0x01 && gyro_config == 0x08 && accel_config == 0x08) {
-        send_bluetooth_message("✅ MPU9250 initialized successfully\r\n");
-        mpu9250_initialized = true;
-        return true; // FIXED: Return success status
-    } else {
-        send_bluetooth_message("❌ MPU9250 configuration verification failed\r\n");
-        mpu9250_initialized = false;
-        return false; // FIXED: Return failure status
-    }
+    send_bluetooth_message("MPU9250 init OK\r\n");
+    mpu9250_initialized=true;
+    return true;
 }
 
 
@@ -331,19 +297,19 @@ float mpu9250_get_gyro_z_dps(void)
 }
 
 /**
- * @brief Detect turns using gyroscope
+ * @brief Detect turns using gyroscope, detection with lower threshold
  */
-bool mpu9250_detect_turn(void)
-{
-    if (!mpu9250_initialized) {
-        return false; // Can't detect turns if not initialized
+
+bool mpu9250_detect_turn(void) {
+    if (!mpu9250_is_initialized()) {
+        return false;
     }
 
     mpu9250_read_gyro();
-    float gyro_z_dps = mpu9250_get_gyro_z_dps();
+    float gyro_z_dps = mpu9250_get_gyro_z_compensated();
 
-    // Detect significant rotation (threshold: 50 dps)
-    return (fabsf(gyro_z_dps) > 50.0f);
+    // CORRECTED: Lower threshold for better sensitivity (was 50 dps)
+    return (fabsf(gyro_z_dps) > 15.0f); // 15 dps threshold
 }
 
 /**

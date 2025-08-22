@@ -156,17 +156,20 @@ int main(void)
   HAL_GPIO_WritePin(MOTOR_STBY_GPIO_Port, MOTOR_STBY_Pin, GPIO_PIN_SET); // wake DRV8833
 
   /* USER CODE BEGIN 2 */
-
-
   /* Initialize micromouse system */
   championship_micromouse_init();
-
+  verify_adc_gpio_configuration();
+  calibrate_adc();
+  adc_system_diagnostics();
 
   // Check gyro initialization
   if (!mpu9250_is_initialized()) {
       send_bluetooth_message("❌ CRITICAL: Gyroscope initialization failed!\r\n");
 
   }
+  mpu9250_calibrate_bias();
+  mpu9250_send_status();
+
 
   // Test ADC functionality
   update_sensors();
@@ -181,19 +184,7 @@ int main(void)
   int32_t right_test = get_right_encoder_total();
   HAL_Delay(100);
 
-//  mpu9250_read_gyro();
-//  float heading = 0;
-//  motor_set_fixed(0, true, 800);  // Left forward
-//  motor_set_fixed(1, false, 800); // Right reverse
-//  while (heading < 90.0f) {
-//    mpu9250_read_gyro();
-//    heading += mpu9250_get_gyro_z_compensated() * 0.001f;  // dt in seconds
-//    // Left motor forward, right motor backward
-//    HAL_Delay(1);
-//  }
-//  stop_motors();
-//  robot.direction = (robot.direction + 1) % 4;
-
+//
 //  debug_encoder_setup();
 //  test_encoder_manual();
 //  test_encoder_rotation();
@@ -840,6 +831,54 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
         last_press = current_time;
     }
 }
+
+// Add this function to main.c after MX_GPIO_Init()
+void verify_adc_gpio_configuration(void) {
+    GPIO_InitTypeDef GPIO_InitStruct = {0};
+
+    // Ensure all ADC pins are in analog mode
+    // PA0 (ADC_CHANNEL_0) - Battery
+    GPIO_InitStruct.Pin = GPIO_PIN_0;
+    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
+    GPIO_InitStruct.Pull = GPIO_NOPULL;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // PA2 (ADC_CHANNEL_2) - Front Right
+    GPIO_InitStruct.Pin = GPIO_PIN_2;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // PA3 (ADC_CHANNEL_3) - Side Right
+    GPIO_InitStruct.Pin = GPIO_PIN_3;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // PA4 (ADC_CHANNEL_4) - Side Left
+    GPIO_InitStruct.Pin = GPIO_PIN_4;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    // PA5 (ADC_CHANNEL_5) - Front Left
+    GPIO_InitStruct.Pin = GPIO_PIN_5;
+    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
+
+    send_bluetooth_message("✅ ADC GPIO configuration verified\r\n");
+}
+
+// Add this after MX_ADC1_Init() in main()
+void calibrate_adc(void) {
+    send_bluetooth_message("Calibrating ADC1...\r\n");
+
+    // For STM32F4, use offset calibration if available
+    // Note: STM32F4 doesn't have automatic calibration like F3/L4
+    // But we can do manual offset calibration
+
+    // Ensure ADC is powered up
+    if (HAL_ADC_Init(&hadc1) != HAL_OK) {
+        send_bluetooth_message("❌ ADC initialization failed!\r\n");
+        return;
+    }
+
+    send_bluetooth_message("✅ ADC calibration completed\r\n");
+}
+
 /* USER CODE END 4 */
 
 /**

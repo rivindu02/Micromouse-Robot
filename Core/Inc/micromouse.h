@@ -217,6 +217,8 @@ void update_walls(void);
 void turn_on_emitters(void);
 void turn_off_emitters(void);
 uint16_t read_adc_channel(uint32_t channel);
+bool are_sensors_healthy(void);
+void adc_system_diagnostics(void);
 
 /* Gyroscope functions */
 bool mpu9250_init(void);
@@ -286,6 +288,9 @@ int get_speed_run_optimal_distance(void);
 
 /*GPIO External Interrupt Callback*/
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+/*Verify adc gpio config and calibration*/
+void verify_adc_gpio_configuration(void);
+void calibrate_adc(void);
 
 void move_forward_adaptive_speed(float speed_multiplier);
 bool is_speed_run_ready(void);
