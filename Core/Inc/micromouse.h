@@ -207,6 +207,8 @@ void stop_motors(void);
 void move_forward_distance(int distance_mm);
 void move_forward_adaptive_speed(float speed_multiplier);
 void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool forward, uint16_t duty);
+void test_motors_individual(void);
+void motor_set_fixed(uint8_t motor, bool forward, uint16_t duty);
 
 /* Sensor functions */
 void calibrate_sensors(void);

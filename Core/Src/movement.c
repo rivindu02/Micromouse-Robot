@@ -90,23 +90,22 @@ void start_encoders(void) {
 /**
  * @brief Move forward one cell - FIXED VERSION
  */
-void move_forward(void) {
-    // FIXED: Use safe encoder reading
+void move_forward(void)
+{
+    // Use safe encoder reading
     int32_t start_left = get_left_encoder_total();
     int32_t start_right = get_right_encoder_total();
 
-    // Check bounds before moving - FIXED: Moved bounds checking before movement
+    // Check bounds before moving
     int new_x = robot.x + dx[robot.direction];
     int new_y = robot.y + dy[robot.direction];
-
     if (new_x < 0 || new_x >= MAZE_SIZE || new_y < 0 || new_y >= MAZE_SIZE) {
         send_bluetooth_message("Cannot move - would go out of bounds!\r\n");
         return;
     }
 
-    // Set motors to move forward
-    motor_set(TIM_CHANNEL_1, MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, true, 800); // left ~80%
-    motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, true, 800); // right ~80%
+    motor_set_fixed(0, true, 800);  // Left motor forward
+    motor_set_fixed(1, true, 800);  // Right motor forward
 
     // Move until target distance reached
     int32_t target_counts = ENCODER_COUNTS_PER_CELL;
@@ -126,11 +125,13 @@ void move_forward(void) {
     // Stop motors
     stop_motors();
 
-    // FIXED: Update position only after successful movement
+    // Update position only after successful movement
     robot.x = new_x;
     robot.y = new_y;
     HAL_Delay(100); // Settling time
 }
+
+
 
 /**
  * @brief Turn left 90 degrees - FIXED VERSION (removed unused variables)
@@ -139,9 +140,10 @@ void turn_left(void) {
     // REMOVED: unused variable 'start_left'
     int32_t start_right = get_right_encoder_total();
 
-    // Left motor backward, right motor forward
-    motor_set(TIM_CHANNEL_1, MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, false, 800);
-    motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, true, 800);
+
+    // Left motor reverse, right motor forward
+	motor_set_fixed(0, false, 800); // Left reverse
+	motor_set_fixed(1, true, 800);  // Right forward
 
     int32_t target_counts = ENCODER_COUNTS_PER_TURN;
     while (1) {
@@ -167,8 +169,8 @@ void turn_right(void) {
     // REMOVED: unused variable 'start_right'
 
     // Left motor forward, right motor backward
-    motor_set(TIM_CHANNEL_1, MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, true, 800);
-    motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, false, 800);
+    motor_set_fixed(0, true, 800);  // Left forward
+        motor_set_fixed(1, false, 800); // Right reverse
 
     int32_t target_counts = ENCODER_COUNTS_PER_TURN;
     while (1) {
@@ -197,11 +199,15 @@ void turn_around(void) {
 /**
  * @brief Stop both motors
  */
-void stop_motors(void) {
-    // Brake mode - both pins low
-    motor_set(TIM_CHANNEL_1, MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, true, 0);
-    motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, true, 0);
+void stop_motors(void)
+{
+    // Stop all PWM channels
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);  // Left motor PWM = 0
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);  // Left motor direction = 0
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0);  // Right motor PWM = 0
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, 0);  // Right motor direction = 0
 }
+
 
 /**
  * @brief Move forward a specific distance - FIXED VERSION
@@ -250,17 +256,85 @@ bool is_speed_run_ready(void) {
 }
 
 // helper to set speed (0–1000 = 0–100%)
-void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin,
-               bool forward, uint16_t duty) {
+void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool forward, uint16_t duty) {
     // Validate inputs
     if (duty > 1000) duty = 1000;
 
     // Set PWM duty cycle
     __HAL_TIM_SET_COMPARE(&htim3, ch_pwm, duty);
 
-    // Set direction
-    HAL_GPIO_WritePin(dirPort, dirPin, forward ? GPIO_PIN_SET : GPIO_PIN_RESET);
+    // FIXED: Proper DRV8833 control
+    // For DRV8833: PWM on INx, Direction control on INy
+    // Forward: INx=PWM, INy=LOW
+    // Backward: INx=PWM, INy=HIGH
+    if (forward) {
+        HAL_GPIO_WritePin(dirPort, dirPin, GPIO_PIN_RESET);  // Direction LOW for forward
+    } else {
+        HAL_GPIO_WritePin(dirPort, dirPin, GPIO_PIN_SET);    // Direction HIGH for backward
+    }
 }
+// Fixed motor_set function for DRV8833
+void motor_set_fixed(uint8_t motor, bool forward, uint16_t duty) {
+    if (motor == 0) { // Left motor
+        if (forward) {
+            // Left forward: IN1=PWM, IN2=LOW
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty); // PA6 = PWM
+            HAL_GPIO_WritePin(MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, GPIO_PIN_RESET); // PA7 = LOW
+        } else {
+            // Left reverse: IN1=LOW, IN2=PWM
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0); // PA6 = LOW
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, duty); // PA7 = PWM
+        }
+    } else { // Right motor
+    	bool actual_forward = !forward;  // invert direction
+        if (actual_forward) {
+            // Right forward: IN3=PWM, IN4=LOW
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, duty); // PB0 = PWM
+            HAL_GPIO_WritePin(MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, GPIO_PIN_RESET); // PB1 = LOW
+        } else {
+            // Right reverse: IN3=LOW, IN4=PWM
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0); // PB0 = LOW
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, duty); // PB1 = PWM
+        }
+    }
+}
+
+// Add this function to test motors individually
+void test_motors_individual(void) {
+    send_bluetooth_message("Testing motors individually...\r\n");
+
+    // Test left motor forward
+    send_bluetooth_message("Left motor forward...\r\n");
+    motor_set_fixed(0, true, 600);
+    HAL_Delay(2000);
+    stop_motors();
+    HAL_Delay(500);
+
+    // Test left motor reverse
+    send_bluetooth_message("Left motor reverse...\r\n");
+    motor_set_fixed(0, false, 600);
+    HAL_Delay(2000);
+    stop_motors();
+    HAL_Delay(500);
+
+    // Test right motor forward
+    send_bluetooth_message("Right motor forward...\r\n");
+    motor_set_fixed(1, true, 600);
+    HAL_Delay(2000);
+    stop_motors();
+    HAL_Delay(500);
+
+    // Test right motor reverse
+    send_bluetooth_message("Right motor reverse...\r\n");
+    motor_set_fixed(1, false, 600);
+    HAL_Delay(2000);
+    stop_motors();
+    HAL_Delay(1000);
+
+    send_bluetooth_message("Motor test complete!\r\n");
+}
+
+
 
 /**
  * @brief Get encoder status for debugging - NEW FUNCTION

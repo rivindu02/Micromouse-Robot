@@ -181,10 +181,11 @@ int main(void)
   int32_t right_test = get_right_encoder_total();
   HAL_Delay(100);
 
+  championship_move_forward();
 
-  debug_encoder_setup();
-  test_encoder_manual();
-  test_encoder_rotation();
+//  debug_encoder_setup();
+//  test_encoder_manual();
+//  test_encoder_rotation();
   left_test = get_left_encoder_total();
   right_test = get_right_encoder_total();
 
