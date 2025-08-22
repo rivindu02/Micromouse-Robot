@@ -41,37 +41,42 @@ void turn_off_emitters(void)
 /**
  * @brief Read specific ADC channel using main.c multi-channel setup
  */
-uint16_t read_adc_channel(uint32_t channel)
-{
-    // Use the 5-channel continuous setup from main.c
-    uint32_t adc_values[5];
+uint16_t read_adc_channel(uint32_t channel) {
+    ADC_ChannelConfTypeDef sConfig = {0};
+    uint16_t adc_value = 0;
 
-    // Start continuous conversion of all 5 channels
+    // Configure the channel
+    sConfig.Channel = channel;
+    sConfig.Rank = 1;
+    sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES; // Longer sampling time
+
+    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
+        send_bluetooth_message("❌ ADC channel config failed\r\n");
+        return 0;
+    }
+
+    // Start ADC conversion
     if (HAL_ADC_Start(&hadc1) != HAL_OK) {
-        return 0; // Hardware error - return safe value
+        send_bluetooth_message("❌ ADC start failed\r\n");
+        return 0;
     }
 
-    // Read all 5 channels in sequence (as configured in main.c)
-    for (int i = 0; i < 5; i++) {
-        if (HAL_ADC_PollForConversion(&hadc1, 50) != HAL_OK) {
-            HAL_ADC_Stop(&hadc1);
-            return 0; // Timeout error
-        }
-        adc_values[i] = HAL_ADC_GetValue(&hadc1);
+    // Wait for conversion with longer timeout
+    if (HAL_ADC_PollForConversion(&hadc1, 100) != HAL_OK) {
+        send_bluetooth_message("❌ ADC conversion timeout\r\n");
+        HAL_ADC_Stop(&hadc1);
+        return 0;
     }
 
+    // Get the converted value
+    adc_value = HAL_ADC_GetValue(&hadc1);
+
+    // Stop ADC
     HAL_ADC_Stop(&hadc1);
 
-    // Return the correct channel value based on main.c rank order
-    switch (channel) {
-        case ADC_CHANNEL_0: return adc_values[0]; // Rank 1 - Battery
-        case ADC_CHANNEL_2: return adc_values[1]; // Rank 2 - Front Right
-        case ADC_CHANNEL_3: return adc_values[2]; // Rank 3 - Side Right
-        case ADC_CHANNEL_4: return adc_values[3]; // Rank 4 - Side Left
-        case ADC_CHANNEL_5: return adc_values[4]; // Rank 5 - Front Left
-        default: return 0;
-    }
+    return adc_value;
 }
+
 
 
 /**
@@ -118,7 +123,7 @@ void update_sensors(void)
         sensor_error_count++;
         if (sensor_error_count > 5) {
             sensors_healthy = false;
-            send_bluetooth_message("⚠️ WARNING: Sensor readings abnormal\r\n");
+            //send_bluetooth_message("⚠️ WARNING: Sensor readings abnormal\r\n");///////////////
             // Don't halt - allow robot to continue with degraded sensors
         }
     } else {
@@ -189,4 +194,48 @@ void calibrate_sensors(void)
     }
 
     send_bluetooth_message("Sensor calibration complete\r\n");
+}
+
+
+void adc_system_diagnostics(void) {
+    send_bluetooth_message("\r\n=== ADC SYSTEM DIAGNOSTICS ===\r\n");
+
+    // Check if ADC clock is enabled
+    if (__HAL_RCC_ADC1_IS_CLK_ENABLED()) {
+        send_bluetooth_message("✅ ADC1 clock: ENABLED\r\n");
+    } else {
+        send_bluetooth_message("❌ ADC1 clock: DISABLED\r\n");
+    }
+
+    // Check GPIO clock
+    if (__HAL_RCC_GPIOA_IS_CLK_ENABLED()) {
+        send_bluetooth_message("✅ GPIOA clock: ENABLED\r\n");
+    } else {
+        send_bluetooth_message("❌ GPIOA clock: DISABLED\r\n");
+    }
+
+    // Check ADC status
+    if (hadc1.State == HAL_ADC_STATE_READY) {
+        send_bluetooth_message("✅ ADC state: READY\r\n");
+    } else {
+        send_bluetooth_printf("⚠️ ADC state: %d\r\n", hadc1.State);
+    }
+
+    // Test individual channel readings
+    send_bluetooth_message("Testing individual channels:\r\n");
+
+    uint32_t channels[5] = {ADC_CHANNEL_0, ADC_CHANNEL_2, ADC_CHANNEL_3, ADC_CHANNEL_4, ADC_CHANNEL_5};
+    const char* channel_names[5] = {"Battery", "Front_Right", "Side_Right", "Side_Left", "Front_Left"};
+    uint16_t test_values[5];  // Fixed: Added array brackets
+
+    for (int i = 0; i < 5; i++) {
+        test_values[i] = read_adc_channel(channels[i]);
+        send_bluetooth_printf("%s (CH%d): %d\r\n", channel_names[i],
+                             channels[i] == ADC_CHANNEL_0 ? 0 :
+                             channels[i] == ADC_CHANNEL_2 ? 2 :
+                             channels[i] == ADC_CHANNEL_3 ? 3 :
+                             channels[i] == ADC_CHANNEL_4 ? 4 : 5, test_values[i]);
+    }
+
+    send_bluetooth_message("===============================\r\n");
 }

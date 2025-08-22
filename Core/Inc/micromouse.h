@@ -128,6 +128,31 @@ typedef struct {
     int32_t left_total;
     int32_t right_total;
 } EncoderData;
+typedef struct {
+    // Profile parameters
+    float max_velocity;        // mm/s - Maximum velocity
+    float max_acceleration;    // mm/s² - Maximum acceleration
+    float max_jerk;           // mm/s³ - Maximum jerk
+    float target_distance;    // mm - Target distance to travel
+
+    // Current state
+    float current_position;   // mm - Current position
+    float current_velocity;   // mm/s - Current velocity
+    float current_acceleration; // mm/s² - Current acceleration
+    float current_jerk;       // mm/s³ - Current jerk
+
+    // Time parameters
+    float t1, t2, t3, t4, t5, t6, t7; // 7-segment time durations
+    float total_time;         // Total profile time
+    uint32_t start_time;      // Profile start timestamp
+
+    // Status
+    bool profile_active;
+    bool profile_complete;
+    uint8_t current_segment;  // 1-7 for each S-curve segment
+} SCurveProfile;
+
+
 
 /* Global variables */
 extern MazeCell maze[MAZE_SIZE][MAZE_SIZE];
@@ -181,7 +206,9 @@ void turn_around(void);
 void stop_motors(void);
 void move_forward_distance(int distance_mm);
 void move_forward_adaptive_speed(float speed_multiplier);
-static void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin,bool forward, uint16_t duty);
+void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool forward, uint16_t duty);
+void test_motors_individual(void);
+void motor_set_fixed(uint8_t motor, bool forward, uint16_t duty);
 
 /* Sensor functions */
 void calibrate_sensors(void);
@@ -190,6 +217,8 @@ void update_walls(void);
 void turn_on_emitters(void);
 void turn_off_emitters(void);
 uint16_t read_adc_channel(uint32_t channel);
+bool are_sensors_healthy(void);
+void adc_system_diagnostics(void);
 
 /* Gyroscope functions */
 bool mpu9250_init(void);
@@ -259,6 +288,9 @@ int get_speed_run_optimal_distance(void);
 
 /*GPIO External Interrupt Callback*/
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
+/*Verify adc gpio config and calibration*/
+void verify_adc_gpio_configuration(void);
+void calibrate_adc(void);
 
 void move_forward_adaptive_speed(float speed_multiplier);
 bool is_speed_run_ready(void);
@@ -267,9 +299,21 @@ bool mpu9250_is_initialized(void);
 void mpu9250_send_status(void);
 void send_encoder_status(void);
 
-/* Enhanced movement functions with S-curve */
+void debug_encoder_setup(void);
+void test_encoder_manual(void);
+void test_encoder_rotation(void);
+
+/* Enhanced movement functions with Trapezoidal -curve */
 void move_forward_with_profile(float distance_mm, float max_speed);
 void move_forward_smooth(float distance_mm);
 
-
+/* enhanced_movement.c with s-curve */
+void move_forward_scurve(float distance_mm, float speed_multiplier);
+void turn_scurve(int turn_direction);
+void move_forward_cell_scurve(void);
+void turn_left_scurve(void);
+void turn_right_scurve(void);
+void turn_around_scurve(void);
+void move_forward_adaptive_scurve(float speed_multiplier);
+void send_scurve_movement_status(void);
 #endif /* MICROMOUSE_H */

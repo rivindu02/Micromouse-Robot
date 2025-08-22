@@ -291,6 +291,25 @@ void turn_to_direction(int target_dir)
     }
 }
 
+// with s-curve
+//void turn_to_direction(int target_dir) {
+//    while (robot.direction != target_dir) {
+//        int turn_diff = (target_dir - robot.direction + 4) % 4;
+//        if (turn_diff == 1) {
+//            turn_right_scurve();  // NEW S-CURVE
+//            // Direction updated inside function
+//        } else if (turn_diff == 3) {
+//            turn_left_scurve();   // NEW S-CURVE
+//            // Direction updated inside function
+//        } else if (turn_diff == 2) {
+//            turn_around_scurve(); // NEW S-CURVE
+//            // Direction updated inside function
+//        }
+//    }
+//}
+
+
+
 /**
  * @brief Move robot forward one cell (MMS style)
  */
@@ -303,7 +322,7 @@ bool championship_move_forward(void)
         return false;
     }
 
-    move_forward();
+    move_forward();  	//move_forward_cell_scurve();
     robot.exploration_steps++;
     exploration_steps++;
 
