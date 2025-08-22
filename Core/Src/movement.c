@@ -170,7 +170,7 @@ void turn_right(void) {
 
     // Left motor forward, right motor backward
     motor_set_fixed(0, true, 800);  // Left forward
-        motor_set_fixed(1, false, 800); // Right reverse
+    motor_set_fixed(1, false, 800); // Right reverse
 
     int32_t target_counts = ENCODER_COUNTS_PER_TURN;
     while (1) {

@@ -181,7 +181,18 @@ int main(void)
   int32_t right_test = get_right_encoder_total();
   HAL_Delay(100);
 
-  championship_move_forward();
+//  mpu9250_read_gyro();
+//  float heading = 0;
+//  motor_set_fixed(0, true, 800);  // Left forward
+//  motor_set_fixed(1, false, 800); // Right reverse
+//  while (heading < 90.0f) {
+//    mpu9250_read_gyro();
+//    heading += mpu9250_get_gyro_z_compensated() * 0.001f;  // dt in seconds
+//    // Left motor forward, right motor backward
+//    HAL_Delay(1);
+//  }
+//  stop_motors();
+//  robot.direction = (robot.direction + 1) % 4;
 
 //  debug_encoder_setup();
 //  test_encoder_manual();
