@@ -181,7 +181,7 @@ void turn_around(void);
 void stop_motors(void);
 void move_forward_distance(int distance_mm);
 void move_forward_adaptive_speed(float speed_multiplier);
-static void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin,bool forward, uint16_t duty);
+void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool forward, uint16_t duty);
 
 /* Sensor functions */
 void calibrate_sensors(void);
@@ -266,6 +266,10 @@ int get_speed_run_optimal_distance(void);
 bool mpu9250_is_initialized(void);
 void mpu9250_send_status(void);
 void send_encoder_status(void);
+
+void debug_encoder_setup(void);
+void test_encoder_manual(void);
+void test_encoder_rotation(void);
 
 /* Enhanced movement functions with S-curve */
 void move_forward_with_profile(float distance_mm, float max_speed);

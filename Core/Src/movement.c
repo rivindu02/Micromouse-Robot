@@ -270,13 +270,16 @@ bool is_speed_run_ready(void) {
 
 
 // helper to set speed (0–1000 = 0–100%)
-static void motor_set(uint16_t ch_pwm,
-                      GPIO_TypeDef *dirPort, uint16_t dirPin,
-                      bool forward, uint16_t duty)          // 0-1000
-{
-    __HAL_TIM_SET_COMPARE(&htim3, ch_pwm, duty);            // PWM duty
-    HAL_GPIO_WritePin(dirPort, dirPin,
-                      forward ? GPIO_PIN_SET : GPIO_PIN_RESET); // DIR
+void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin,
+                     bool forward, uint16_t duty) {
+    // Validate inputs
+    if (duty > 1000) duty = 1000;
+
+    // Set PWM duty cycle
+    __HAL_TIM_SET_COMPARE(&htim3, ch_pwm, duty);
+
+    // Set direction
+    HAL_GPIO_WritePin(dirPort, dirPin, forward ? GPIO_PIN_SET : GPIO_PIN_RESET);
 }
 
 
@@ -341,5 +344,72 @@ void move_forward_with_profile(float distance_mm, float max_speed) {
  */
 void move_forward_smooth(float distance_mm) {
     move_forward_with_profile(distance_mm, 600.0f); // 600 mm/s max speed
+}
+
+
+
+// Add to movement.c
+void debug_encoder_setup(void) {
+    send_bluetooth_message("=== ENCODER DEBUG ===\r\n");
+
+    // Check if timer clocks are enabled
+    if (RCC->APB1ENR & RCC_APB1ENR_TIM2EN) {
+        send_bluetooth_message("TIM2 clock: ENABLED\r\n");
+    } else {
+        send_bluetooth_message("TIM2 clock: DISABLED\r\n");
+    }
+
+    if (RCC->APB1ENR & RCC_APB1ENR_TIM4EN) {
+        send_bluetooth_message("TIM4 clock: ENABLED\r\n");
+    } else {
+        send_bluetooth_message("TIM4 clock: DISABLED\r\n");
+    }
+
+    // Check timer register values
+    send_bluetooth_printf("TIM2 registers - CR1:0x%08X SMCR:0x%08X\r\n",
+                         TIM2->CR1, TIM2->SMCR);
+    send_bluetooth_printf("TIM4 registers - CR1:0x%08X SMCR:0x%08X\r\n",
+                         TIM4->CR1, TIM4->SMCR);
+}
+
+void test_encoder_manual(void) {
+    send_bluetooth_message("Testing manual encoder increment...\r\n");
+
+    // Manual test - set counter values
+    TIM2->CNT = 100;
+    TIM4->CNT = 200;
+
+    HAL_Delay(10);
+
+    send_bluetooth_printf("TIM2 CNT: %d, TIM4 CNT: %d\r\n",
+                         TIM2->CNT, TIM4->CNT);
+}
+
+// Add to main.c after your current debug code
+void test_encoder_rotation(void) {
+    send_bluetooth_message("\r\n🔄 ENCODER ROTATION TEST\r\n");
+    send_bluetooth_message("Manually rotate each wheel and watch the counts:\r\n");
+
+    // Reset counters to known values
+    TIM2->CNT = 1000;  // Left encoder
+    TIM4->CNT = 2000;  // Right encoder
+
+    send_bluetooth_message("Initial values set - TIM2: 1000, TIM4: 2000\r\n");
+    send_bluetooth_message("Now manually rotate the wheels...\r\n");
+
+    // Monitor for 10 seconds
+    for(int i = 0; i < 20; i++) {
+        uint16_t left_raw = TIM2->CNT;
+        uint16_t right_raw = TIM4->CNT;
+        int32_t left_total = get_left_encoder_total();
+        int32_t right_total = get_right_encoder_total();
+
+        send_bluetooth_printf("T+%ds: Raw L:%d R:%d | Total L:%ld R:%ld\r\n",
+                             i/2, left_raw, right_raw, left_total, right_total);
+
+        HAL_Delay(500);
+    }
+
+    send_bluetooth_message("Rotation test complete!\r\n");
 }
 

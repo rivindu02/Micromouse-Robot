@@ -180,6 +180,11 @@ int main(void)
   HAL_Delay(10);
   int32_t left_test = get_left_encoder_total();
   int32_t right_test = get_right_encoder_total();
+
+  debug_encoder_setup();
+  test_encoder_manual();
+  test_encoder_rotation();
+
   if (left_test == 0 && right_test == 0) {
       send_bluetooth_message("⚠️ WARNING: Encoders may not be working\r\n");
       // Don't mark as critical failure - encoders might be stationary
@@ -241,7 +246,6 @@ int main(void)
 
 	  if (button_pressed == 1) {
 		  button_pressed = 0;
-		  send_bluetooth_message("Left button pressed\r\n");
 		  // Left button - start speed run or new exploration
 		  if (robot.center_reached && robot.returned_to_start) {
 			  championship_speed_run(); // Championship speed run with MMS path
@@ -254,7 +258,6 @@ int main(void)
 
 	  if (button_pressed == 2) {
 		  button_pressed = 0;
-		  send_bluetooth_message("Right button pressed\r\n");
 		  // Right button - reset system
 		  reset_championship_micromouse();
 		  send_bluetooth_message("Championship system reset\r\n");
@@ -814,10 +817,10 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin)
         if (GPIO_Pin == BTN_LEFT_Pin) {
             button_pressed = 1;
             start_flag = 1;  // Allow system to start
-            //send_bluetooth_message("Left button pressed\r\n");
+            send_bluetooth_message("Left button pressed\r\n");
         } else if (GPIO_Pin == BTN_RIGHT_Pin) {
             button_pressed = 2;
-            //send_bluetooth_message("Right button pressed\r\n");
+            send_bluetooth_message("Right button pressed\r\n");
         }
         last_press = current_time;
     }

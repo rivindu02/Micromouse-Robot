@@ -25,7 +25,7 @@
 #define MPU9250_GYRO_XOUT_H 0x43
 #define MPU9250_TEMP_OUT_H 0x41
 #define MPU9250_USER_CTRL 0x6A  // ADDED: For I2C disable
-#define MPU9250_WHO_AM_I_RESPONSE 0x71
+#define MPU9250_WHO_AM_I_RESPONSE 0x70
 
 // ADDED: Global variable to track initialization status
 static bool mpu9250_initialized = false;

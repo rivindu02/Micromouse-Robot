@@ -11,7 +11,10 @@
 ../Core/Src/movement.c:225:6:move_forward_distance	48	static
 ../Core/Src/movement.c:256:6:move_forward_adaptive_speed	24	static
 ../Core/Src/movement.c:266:6:is_speed_run_ready	4	static
-../Core/Src/movement.c:273:13:motor_set	24	static
-../Core/Src/movement.c:288:6:send_encoder_status	16	static
-../Core/Src/movement.c:300:6:move_forward_with_profile	88	static
-../Core/Src/movement.c:342:6:move_forward_smooth	16	static
+../Core/Src/movement.c:273:6:motor_set	24	static
+../Core/Src/movement.c:290:6:send_encoder_status	16	static
+../Core/Src/movement.c:302:6:move_forward_with_profile	88	static
+../Core/Src/movement.c:344:6:move_forward_smooth	16	static
+../Core/Src/movement.c:351:6:debug_encoder_setup	8	static
+../Core/Src/movement.c:374:6:test_encoder_manual	8	static
+../Core/Src/movement.c:388:6:test_encoder_rotation	32	static

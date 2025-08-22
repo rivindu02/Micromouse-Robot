@@ -118,7 +118,7 @@ void update_sensors(void)
         sensor_error_count++;
         if (sensor_error_count > 5) {
             sensors_healthy = false;
-            send_bluetooth_message("⚠️ WARNING: Sensor readings abnormal\r\n");
+            //send_bluetooth_message("⚠️ WARNING: Sensor readings abnormal\r\n");///////////////
             // Don't halt - allow robot to continue with degraded sensors
         }
     } else {
