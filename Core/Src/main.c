@@ -159,7 +159,6 @@ int main(void)
   /* Initialize micromouse system */
   championship_micromouse_init();
   verify_adc_gpio_configuration();
-  calibrate_adc();
   adc_system_diagnostics();
 
   // Check gyro initialization
@@ -180,21 +179,33 @@ int main(void)
 
   // Test encoder functionality
   start_encoders();
-  int32_t left_test = get_left_encoder_total();
-  int32_t right_test = get_right_encoder_total();
+  reset_encoder_totals();
+//  int32_t left_test = get_left_encoder_total();
+//  int32_t right_test = get_right_encoder_total();
   HAL_Delay(100);
 
-//
+  while(get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
+	  moveStraightPID();
+	  //HAL_Delay(1);
+	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
+  }
+  break_motors();
+
+  HAL_Delay(100);
+
+
 //  debug_encoder_setup();
 //  test_encoder_manual();
 //  test_encoder_rotation();
-  left_test = get_left_encoder_total();
-  right_test = get_right_encoder_total();
+//  left_test = get_left_encoder_total();
+//  right_test = get_right_encoder_total();
 
-  if (left_test == 0 && right_test == 0) {
+  if (get_left_encoder_total() == 0 && get_right_encoder_total() == 0) {
       send_bluetooth_message("⚠️ WARNING: Encoders may not be working\r\n");
       // Don't mark as critical failure - encoders might be stationary
   }
+
+
 
 
   /* Play startup tone */
@@ -862,22 +873,6 @@ void verify_adc_gpio_configuration(void) {
     send_bluetooth_message("✅ ADC GPIO configuration verified\r\n");
 }
 
-// Add this after MX_ADC1_Init() in main()
-void calibrate_adc(void) {
-    send_bluetooth_message("Calibrating ADC1...\r\n");
-
-    // For STM32F4, use offset calibration if available
-    // Note: STM32F4 doesn't have automatic calibration like F3/L4
-    // But we can do manual offset calibration
-
-    // Ensure ADC is powered up
-    if (HAL_ADC_Init(&hadc1) != HAL_OK) {
-        send_bluetooth_message("❌ ADC initialization failed!\r\n");
-        return;
-    }
-
-    send_bluetooth_message("✅ ADC calibration completed\r\n");
-}
 
 /* USER CODE END 4 */
 

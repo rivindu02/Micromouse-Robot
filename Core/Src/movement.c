@@ -29,7 +29,7 @@ void update_encoder_totals(void)
     int16_t right_diff = current_right_raw - last_right_count;
 
     // FIXED: Invert left encoder to match right encoder direction
-    left_diff = -left_diff;  // Make left encoder positive for forward movement
+    right_diff = -right_diff;  // Make left encoder positive for forward movement
 
     // Update totals
     left_total += left_diff;
@@ -207,7 +207,16 @@ void stop_motors(void)
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0);  // Right motor PWM = 0
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, 0);  // Right motor direction = 0
 }
-
+void break_motors(void)
+{
+    // Stop all PWM channels
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 1);  // Left motor PWM = 0
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 1);  // Left motor direction = 0
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 1);  // Right motor PWM = 0
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, 1);  // Right motor direction = 0
+    HAL_Delay(500);
+    stop_motors();
+}
 
 /**
  * @brief Move forward a specific distance - FIXED VERSION
@@ -277,24 +286,27 @@ void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool for
 void motor_set_fixed(uint8_t motor, bool forward, uint16_t duty) {
     if (motor == 0) { // Left motor
         if (forward) {
-            // Left forward: IN1=PWM, IN2=LOW
-            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty); // PA6 = PWM
-            HAL_GPIO_WritePin(MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, GPIO_PIN_RESET); // PA7 = LOW
+			// Left reverse: IN1=LOW, IN2=PWM
+        	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, duty); // PA7 = PWM
+        	HAL_GPIO_WritePin(MOTOR_IN1_GPIO_Port, MOTOR_IN1_Pin, GPIO_PIN_RESET); // PA6 = LOW
+
         } else {
-            // Left reverse: IN1=LOW, IN2=PWM
-            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0); // PA6 = LOW
-            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, duty); // PA7 = PWM
+        	// Left forward: IN1=PWM, IN2=LOW
+			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty); // PA6 = PWM
+			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0); // PA7 = LOW
+
         }
     } else { // Right motor
     	bool actual_forward = !forward;  // invert direction
         if (actual_forward) {
-            // Right forward: IN3=PWM, IN4=LOW
-            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, duty); // PB0 = PWM
-            HAL_GPIO_WritePin(MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, GPIO_PIN_RESET); // PB1 = LOW
-        } else {
             // Right reverse: IN3=LOW, IN4=PWM
-            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0); // PB0 = LOW
-            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, duty); // PB1 = PWM
+        	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, duty); // PB1 = PWM
+        	HAL_GPIO_WritePin(MOTOR_IN3_GPIO_Port, MOTOR_IN3_Pin, GPIO_PIN_RESET); // PB0 = LOW
+        } else {
+            // Right forward: IN3=PWM, IN4=LOW
+        	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, 0); // PB1 = LOW
+            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, duty); // PB0 = PWM
+
         }
     }
 }
@@ -387,6 +399,51 @@ void move_forward_with_profile(float distance_mm, float max_speed) {
     stop_motors();
 }
 
+// PID parameters for encoders
+float Kp_e =0; // Proportional term
+float Ki_e = 0; // Integral term
+float Kd_e = 0; // Derivative term
+float errorenco = 0;
+float previousErrorenco = 0;
+float integralenco = 0;
+float derivativeenco = 0;
+/*
+ * Encoder PID
+ * */
+void moveStraightPID(void) {
+	left_total=get_left_encoder_total();
+	left_total=get_left_encoder_total();
+	errorenco = left_total - right_total;
+
+	integralenco += errorenco;
+	derivativeenco = errorenco - previousErrorenco;
+
+	float correction = (Kp_e * errorenco) + (Ki_e * integralenco) + (Kd_e * derivativeenco);
+
+	int motor1Speed = 600 - correction;
+	int motor2Speed = 600 + correction;
+
+	if (motor1Speed>1000){
+	  motor1Speed= 1000;
+	};
+	if (motor2Speed>1000){
+	  motor2Speed= 1000;
+	};
+	if (motor1Speed<0){
+	  motor1Speed= 0;
+	};
+	if (motor2Speed<0){
+	  motor2Speed= 0;
+	};
+
+	motor_set_fixed(0, true, motor2Speed);//Left
+
+	motor_set_fixed(1, true, motor1Speed);//Right
+
+
+	previousErrorenco = errorenco;
+}
+
 /**
  * @brief Simple smooth movement for one cell
  */
@@ -446,8 +503,8 @@ void test_encoder_rotation(void) {
     for(int i = 0; i < 20; i++) {
         uint16_t left_raw = TIM2->CNT;
         uint16_t right_raw = TIM4->CNT;
-        int32_t left_total = get_left_encoder_total();
-        int32_t right_total = get_right_encoder_total();
+        int32_t left_total = get_left_encoder_total()-31768;
+        int32_t right_total = get_right_encoder_total()+30768;
 
         send_bluetooth_printf("T+%ds: Raw L:%d R:%d | Total L:%ld R:%ld\r\n",
                              i/2, left_raw, right_raw, left_total, right_total);

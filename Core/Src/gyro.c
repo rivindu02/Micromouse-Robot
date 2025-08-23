@@ -342,3 +342,6 @@ void mpu9250_send_status(void)
                              gyro.accel_x, gyro.accel_y, gyro.accel_z);
     }
 }
+
+
+

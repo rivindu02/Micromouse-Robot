@@ -13,8 +13,21 @@
 
 #include "micromouse.h"
 
-static uint8_t sensor_error_count = 0;
-static bool sensors_healthy = true;
+
+
+
+// Calibration data structure
+typedef struct {
+    uint16_t ambient_baseline[4];        // Baseline ambient light for each sensor
+    uint16_t wall_thresholds[4];         // Dynamic wall detection thresholds
+    uint16_t battery_baseline;           // Battery voltage baseline
+    uint16_t sensor_min[4];             // Minimum readings during calibration
+    uint16_t sensor_max[4];             // Maximum readings during calibration
+    bool calibration_valid;              // Flag indicating successful calibration
+    float noise_levels[4];              // Noise level for each sensor
+} SensorCalibration;
+
+static SensorCalibration sensor_cal = {0};
 /**
  * @brief Turn on IR emitters
  */
@@ -80,14 +93,13 @@ uint16_t read_adc_channel(uint32_t channel) {
 
 
 /**
- * @brief Update all sensor readings
+ * @brief Enhanced update_sensors with calibrated thresholds
  */
 void update_sensors(void)
 {
     // Read ambient light levels (emitters off)
     turn_off_emitters();
     HAL_Delay(1);
-
     uint16_t ambient_front_right = read_adc_channel(ADC_CHANNEL_2);
     uint16_t ambient_side_right = read_adc_channel(ADC_CHANNEL_3);
     uint16_t ambient_side_left = read_adc_channel(ADC_CHANNEL_4);
@@ -95,7 +107,6 @@ void update_sensors(void)
 
     // Read with emitters on
     turn_on_emitters();
-
     sensors.battery = read_adc_channel(ADC_CHANNEL_0);
     sensors.front_right = read_adc_channel(ADC_CHANNEL_2) - ambient_front_right;
     sensors.side_right = read_adc_channel(ADC_CHANNEL_3) - ambient_side_right;
@@ -105,29 +116,42 @@ void update_sensors(void)
     // Turn off emitters to save power
     turn_off_emitters();
 
-    // Process wall detection
-    sensors.wall_front = (sensors.front_left > WALL_THRESHOLD_FRONT) ||
-                         (sensors.front_right > WALL_THRESHOLD_FRONT);
-    sensors.wall_left = (sensors.side_left > WALL_THRESHOLD_SIDE);
-    sensors.wall_right = (sensors.side_right > WALL_THRESHOLD_SIDE);
-
-
-    // Check for sensor health
-    bool current_reading_valid = (sensors.battery > 100) && // Reasonable battery reading
-                               (sensors.front_left < 4000) && // Not maxed out
-                               (sensors.front_right < 4000) &&
-                               (sensors.side_left < 4000) &&
-                               (sensors.side_right < 4000);
-
-    if (!current_reading_valid) {
-        sensor_error_count++;
-        if (sensor_error_count > 5) {
-            sensors_healthy = false;
-            //send_bluetooth_message("⚠️ WARNING: Sensor readings abnormal\r\n");///////////////
-            // Don't halt - allow robot to continue with degraded sensors
-        }
+    // Process wall detection using calibrated thresholds
+    if (sensor_cal.calibration_valid) {
+        // Use dynamic thresholds
+        sensors.wall_front = (sensors.front_left > get_calibrated_threshold(0)) ||
+                            (sensors.front_right > get_calibrated_threshold(1));
+        sensors.wall_left = (sensors.side_left > get_calibrated_threshold(2));
+        sensors.wall_right = (sensors.side_right > get_calibrated_threshold(3));
     } else {
-        if (sensor_error_count > 0) sensor_error_count--; // Recover slowly
+        // Fallback to static thresholds
+        sensors.wall_front = (sensors.front_left > WALL_THRESHOLD_FRONT) ||
+                            (sensors.front_right > WALL_THRESHOLD_FRONT);
+        sensors.wall_left = (sensors.side_left > WALL_THRESHOLD_SIDE);
+        sensors.wall_right = (sensors.side_right > WALL_THRESHOLD_SIDE);
+    }
+
+    // Enhanced sensor health monitoring using calibration data
+    static uint8_t sensor_error_count = 0;
+    static bool sensors_healthy = true;
+
+    if (sensor_cal.calibration_valid) {
+        // Check if readings are within expected ranges based on calibration
+        bool current_reading_valid = (sensors.battery > sensor_cal.battery_baseline - 200) &&
+                                   (sensors.battery < sensor_cal.battery_baseline + 500) &&
+                                   (sensors.front_left < 3500) &&
+                                   (sensors.front_right < 3500) &&
+                                   (sensors.side_left < 3500) &&
+                                   (sensors.side_right < 3500);
+
+        if (!current_reading_valid) {
+            sensor_error_count++;
+            if (sensor_error_count > 5) {
+                sensors_healthy = false;
+            }
+        } else {
+            if (sensor_error_count > 0) sensor_error_count--; // Recover slowly
+        }
     }
 }
 
@@ -172,28 +196,58 @@ void update_walls(void)
     maze[robot.x][robot.y].visit_count++;
 }
 
+
 /**
- * @brief Check if sensors are healthy
+ * @brief Get sensor calibration status
  */
-bool are_sensors_healthy(void)
+bool is_sensor_calibration_valid(void)
 {
-    return sensors_healthy;
+    return sensor_cal.calibration_valid;
 }
 
 /**
- * @brief Calibrate sensors (placeholder for now)
+ * @brief Send detailed sensor status including calibration data
  */
-void calibrate_sensors(void)
+void send_detailed_sensor_status(void)
 {
-    send_bluetooth_message("Calibrating sensors...\r\n");
+    send_bluetooth_message("\r\n=== DETAILED SENSOR STATUS ===\r\n");
 
-    // Take baseline readings
-    for (int i = 0; i < 10; i++) {
+    if (sensor_cal.calibration_valid) {
+        send_bluetooth_message("Calibration: ✅ VALID\r\n");
+
+        // Update sensors first
         update_sensors();
-        HAL_Delay(50);
+
+        send_bluetooth_message("Current readings vs baselines:\r\n");
+        send_bluetooth_printf("Front Left:  %d (baseline: %d, threshold: %d)\r\n",
+                             sensors.front_left + sensor_cal.ambient_baseline[0],
+                             sensor_cal.ambient_baseline[0],
+                             sensor_cal.wall_thresholds[0]);
+        send_bluetooth_printf("Front Right: %d (baseline: %d, threshold: %d)\r\n",
+                             sensors.front_right + sensor_cal.ambient_baseline[1],
+                             sensor_cal.ambient_baseline[1],
+                             sensor_cal.wall_thresholds[1]);
+        send_bluetooth_printf("Side Left:   %d (baseline: %d, threshold: %d)\r\n",
+                             sensors.side_left + sensor_cal.ambient_baseline[2],
+                             sensor_cal.ambient_baseline[2],
+                             sensor_cal.wall_thresholds[2]);
+        send_bluetooth_printf("Side Right:  %d (baseline: %d, threshold: %d)\r\n",
+                             sensors.side_right + sensor_cal.ambient_baseline[3],
+                             sensor_cal.ambient_baseline[3],
+                             sensor_cal.wall_thresholds[3]);
+
+        send_bluetooth_printf("Battery: %d (baseline: %d)\r\n",
+                             sensors.battery, sensor_cal.battery_baseline);
+
+        send_bluetooth_printf("Wall detection: F:%s L:%s R:%s\r\n",
+                             sensors.wall_front ? "YES" : "NO",
+                             sensors.wall_left ? "YES" : "NO",
+                             sensors.wall_right ? "YES" : "NO");
+    } else {
+        send_bluetooth_message("Calibration: ❌ INVALID - Using default thresholds\r\n");
     }
 
-    send_bluetooth_message("Sensor calibration complete\r\n");
+    send_bluetooth_message("===============================\r\n");
 }
 
 
@@ -238,4 +292,258 @@ void adc_system_diagnostics(void) {
     }
 
     send_bluetooth_message("===============================\r\n");
+}
+
+/**
+ * @brief Enhanced sensor calibration - replaces main.c ADC test code
+ * This function performs comprehensive sensor calibration including:
+ * - Baseline ambient light measurement
+ * - Dynamic wall threshold calculation
+ * - Sensor health validation
+ * - Battery voltage baseline
+ */
+void calibrate_sensors(void)
+{
+    send_bluetooth_message("\r\n=== ENHANCED SENSOR CALIBRATION ===\r\n");
+
+    // Initialize calibration structure
+    memset(&sensor_cal, 0, sizeof(sensor_cal));
+
+    // Phase 1: ADC System Validation
+    send_bluetooth_message("Phase 1: ADC System Validation\r\n");
+
+    // Check if ADC is properly initialized
+    if (hadc1.State != HAL_ADC_STATE_READY) {
+        send_bluetooth_message("❌ ADC not ready - attempting re-initialization\r\n");
+        if (HAL_ADC_Init(&hadc1) != HAL_OK) {
+            send_bluetooth_message("❌ CRITICAL: ADC initialization failed!\r\n");
+            return;
+        }
+    }
+
+    // Verify clock enables
+    if (!__HAL_RCC_ADC1_IS_CLK_ENABLED()) {
+        send_bluetooth_message("❌ ADC1 clock disabled\r\n");
+        return;
+    }
+
+    if (!__HAL_RCC_GPIOA_IS_CLK_ENABLED()) {
+        send_bluetooth_message("❌ GPIOA clock disabled\r\n");
+        return;
+    }
+
+    send_bluetooth_message("✅ ADC system validation passed\r\n");
+
+    // Phase 2: Baseline Ambient Light Measurement
+    send_bluetooth_message("Phase 2: Measuring ambient baselines (IR emitters OFF)\r\n");
+
+    // Ensure emitters are OFF
+    turn_off_emitters();
+    HAL_Delay(100); // Allow sensors to stabilize
+
+    // Take multiple ambient readings for stability
+    uint32_t ambient_sum[4] = {0};
+    uint32_t ambient_readings = 50;
+
+    for (int i = 0; i < ambient_readings; i++) {
+        ambient_sum[0] += read_adc_channel(ADC_CHANNEL_5); // Front Left
+        ambient_sum[1] += read_adc_channel(ADC_CHANNEL_2); // Front Right
+        ambient_sum[2] += read_adc_channel(ADC_CHANNEL_4); // Side Left
+        ambient_sum[3] += read_adc_channel(ADC_CHANNEL_3); // Side Right
+        HAL_Delay(10);
+    }
+
+    // Calculate ambient baselines
+    sensor_cal.ambient_baseline[0] = ambient_sum[0] / ambient_readings; // Front Left
+    sensor_cal.ambient_baseline[1] = ambient_sum[1] / ambient_readings; // Front Right
+    sensor_cal.ambient_baseline[2] = ambient_sum[2] / ambient_readings; // Side Left
+    sensor_cal.ambient_baseline[3] = ambient_sum[3] / ambient_readings; // Side Right
+
+    send_bluetooth_message("Ambient baselines (emitters OFF):\r\n");
+    send_bluetooth_printf("  Front Left:  %d\r\n", sensor_cal.ambient_baseline[0]);
+    send_bluetooth_printf("  Front Right: %d\r\n", sensor_cal.ambient_baseline[1]);
+    send_bluetooth_printf("  Side Left:   %d\r\n", sensor_cal.ambient_baseline[2]);
+    send_bluetooth_printf("  Side Right:  %d\r\n", sensor_cal.ambient_baseline[3]);
+
+    // Phase 3: Active Sensor Response Measurement
+    send_bluetooth_message("Phase 3: Measuring sensor response (IR emitters ON)\r\n");
+
+    // Turn on emitters and measure response
+    turn_on_emitters();
+    HAL_Delay(50); // Emitter stabilization
+
+    uint32_t active_sum[4] = {0};
+    uint32_t active_readings = 50;
+
+    // Track min/max for noise calculation
+    uint16_t temp_min[4] = {4095, 4095, 4095, 4095};
+    uint16_t temp_max[4] = {0, 0, 0, 0};
+
+    for (int i = 0; i < active_readings; i++) {
+        uint16_t readings[4];
+        readings[0] = read_adc_channel(ADC_CHANNEL_5); // Front Left
+        readings[1] = read_adc_channel(ADC_CHANNEL_2); // Front Right
+        readings[2] = read_adc_channel(ADC_CHANNEL_4); // Side Left
+        readings[3] = read_adc_channel(ADC_CHANNEL_3); // Side Right
+
+        for (int j = 0; j < 4; j++) {
+            active_sum[j] += readings[j];
+            if (readings[j] < temp_min[j]) temp_min[j] = readings[j];
+            if (readings[j] > temp_max[j]) temp_max[j] = readings[j];
+        }
+        HAL_Delay(10);
+    }
+
+    // Calculate active response levels and noise
+    uint16_t active_avg[4];
+    for (int i = 0; i < 4; i++) {
+        active_avg[i] = active_sum[i] / active_readings;
+        sensor_cal.sensor_min[i] = temp_min[i];
+        sensor_cal.sensor_max[i] = temp_max[i];
+        sensor_cal.noise_levels[i] = (float)(temp_max[i] - temp_min[i]);
+    }
+
+    send_bluetooth_message("Active sensor response (emitters ON):\r\n");
+    send_bluetooth_printf("  Front Left:  %d (noise: %.1f)\r\n", active_avg[0], sensor_cal.noise_levels[0]);
+    send_bluetooth_printf("  Front Right: %d (noise: %.1f)\r\n", active_avg[1], sensor_cal.noise_levels[1]);
+    send_bluetooth_printf("  Side Left:   %d (noise: %.1f)\r\n", active_avg[2], sensor_cal.noise_levels[2]);
+    send_bluetooth_printf("  Side Right:  %d (noise: %.1f)\r\n", active_avg[3], sensor_cal.noise_levels[3]);
+
+    // Phase 4: Dynamic Threshold Calculation
+    send_bluetooth_message("Phase 4: Calculating dynamic wall detection thresholds\r\n");
+
+    // Calculate differential response (active - ambient)
+    uint16_t differential[4];
+    for (int i = 0; i < 4; i++) {
+        if (active_avg[i] > sensor_cal.ambient_baseline[i]) {
+            differential[i] = active_avg[i] - sensor_cal.ambient_baseline[i];
+        } else {
+            differential[i] = 0; // Sensor may be faulty
+        }
+    }
+
+    // Set dynamic thresholds based on differential response and noise
+    // Front sensors (0,1) typically have higher response near walls
+    // Side sensors (2,3) have different response characteristics
+    for (int i = 0; i < 4; i++) {
+        if (i < 2) { // Front sensors
+            // For front sensors, set threshold at 40% of differential + noise margin
+            sensor_cal.wall_thresholds[i] = sensor_cal.ambient_baseline[i] +
+                                          (differential[i] * 0.4f) +
+                                          (sensor_cal.noise_levels[i] * 3.0f);
+        } else { // Side sensors
+            // For side sensors, set threshold at 30% of differential + noise margin
+            sensor_cal.wall_thresholds[i] = sensor_cal.ambient_baseline[i] +
+                                          (differential[i] * 0.3f) +
+                                          (sensor_cal.noise_levels[i] * 3.0f);
+        }
+
+        // Sanity check - ensure threshold is reasonable
+        if (sensor_cal.wall_thresholds[i] < sensor_cal.ambient_baseline[i] + 100) {
+            sensor_cal.wall_thresholds[i] = sensor_cal.ambient_baseline[i] + 100;
+        }
+        if (sensor_cal.wall_thresholds[i] > 3500) { // Don't exceed reasonable ADC range
+            sensor_cal.wall_thresholds[i] = 3500;
+        }
+    }
+
+    send_bluetooth_message("Dynamic wall detection thresholds:\r\n");
+    send_bluetooth_printf("  Front Left:  %d\r\n", sensor_cal.wall_thresholds[0]);
+    send_bluetooth_printf("  Front Right: %d\r\n", sensor_cal.wall_thresholds[1]);
+    send_bluetooth_printf("  Side Left:   %d\r\n", sensor_cal.wall_thresholds[2]);
+    send_bluetooth_printf("  Side Right:  %d\r\n", sensor_cal.wall_thresholds[3]);
+
+    // Phase 5: Battery Baseline Measurement
+    send_bluetooth_message("Phase 5: Battery voltage baseline measurement\r\n");
+
+    uint32_t battery_sum = 0;
+    for (int i = 0; i < 20; i++) {
+        battery_sum += read_adc_channel(ADC_CHANNEL_0);
+        HAL_Delay(10);
+    }
+    sensor_cal.battery_baseline = battery_sum / 20;
+
+    float battery_voltage = (sensor_cal.battery_baseline * 3.3f) / 4096.0f;
+    send_bluetooth_printf("Battery baseline: %d (%.2fV)\r\n",
+                         sensor_cal.battery_baseline, battery_voltage);
+
+    // Phase 6: Sensor Health Validation
+    send_bluetooth_message("Phase 6: Sensor health validation\r\n");
+
+    bool all_sensors_healthy = true;
+
+    // Check each sensor
+    const char* sensor_names[4] = {"Front Left", "Front Right", "Side Left", "Side Right"};
+
+    for (int i = 0; i < 4; i++) {
+        bool sensor_healthy = true;
+
+        // Check if sensor shows reasonable differential response
+        if (differential[i] < 50) {
+            send_bluetooth_printf("⚠️ %s: Low differential response (%d)\r\n",
+                                 sensor_names[i], differential[i]);
+            sensor_healthy = false;
+        }
+
+        // Check noise levels
+        if (sensor_cal.noise_levels[i] > 200) {
+            send_bluetooth_printf("⚠️ %s: High noise level (%.1f)\r\n",
+                                 sensor_names[i], sensor_cal.noise_levels[i]);
+            sensor_healthy = false;
+        }
+
+        // Check if readings are within reasonable ADC range
+        if (sensor_cal.ambient_baseline[i] > 3800 || sensor_cal.ambient_baseline[i] < 10) {
+            send_bluetooth_printf("⚠️ %s: Ambient reading out of range (%d)\r\n",
+                                 sensor_names[i], sensor_cal.ambient_baseline[i]);
+            sensor_healthy = false;
+        }
+
+        if (sensor_healthy) {
+            send_bluetooth_printf("✅ %s: Healthy\r\n", sensor_names[i]);
+        } else {
+            all_sensors_healthy = false;
+        }
+    }
+
+    // Check battery
+    if (battery_voltage < 3.0f) {
+        send_bluetooth_message("⚠️ Battery: Low voltage detected\r\n");
+        all_sensors_healthy = false;
+    } else if (battery_voltage > 4.5f) {
+        send_bluetooth_message("⚠️ Battery: Voltage too high\r\n");
+        all_sensors_healthy = false;
+    } else {
+        send_bluetooth_message("✅ Battery: Healthy\r\n");
+    }
+
+    // Phase 7: Calibration Complete
+    sensor_cal.calibration_valid = all_sensors_healthy;
+
+    turn_off_emitters(); // Save power
+
+    if (sensor_cal.calibration_valid) {
+        send_bluetooth_message("✅ SENSOR CALIBRATION COMPLETE - All systems nominal\r\n");
+        send_bluetooth_message("Dynamic thresholds will be used for wall detection\r\n");
+    } else {
+        send_bluetooth_message("⚠️ SENSOR CALIBRATION COMPLETE - Some issues detected\r\n");
+        send_bluetooth_message("Robot will continue with degraded sensor performance\r\n");
+    }
+
+    send_bluetooth_message("=====================================\r\n");
+}
+
+/**
+ * @brief Get calibrated wall threshold for specific sensor
+ * @param sensor_index: 0=Front_Left, 1=Front_Right, 2=Side_Left, 3=Side_Right
+ * @return Calibrated threshold value
+ */
+uint16_t get_calibrated_threshold(int sensor_index)
+{
+    if (sensor_index < 0 || sensor_index > 3 || !sensor_cal.calibration_valid) {
+        // Return default thresholds if calibration failed
+        return (sensor_index < 2) ? WALL_THRESHOLD_FRONT : WALL_THRESHOLD_SIDE;
+    }
+
+    return sensor_cal.wall_thresholds[sensor_index];
 }
