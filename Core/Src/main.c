@@ -163,6 +163,15 @@ int main(void)
 
 	  // Set initial conservative PID gains
 	  set_heading_pid_gains(1.0f, 0.0f, 0.1f);
+	  while(1){
+		  mpu9250_read_all();
+		  mpu9250_get_gyro_z_dps();// get the raw reading from gyro
+		  mpu9250_send_status();
+		  HAL_Delay(500);
+
+	  }
+
+
   } else {
 	  send_bluetooth_message("⚠️ Gyro not available - using basic movement\r\n");
   }
