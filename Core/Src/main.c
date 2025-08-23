@@ -207,6 +207,7 @@ int main(void)
   HAL_Delay(100);
 
   while(1){//get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
+	  mpu9250_read_gyro();
 	  moveStraightGyroPID();
 	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
   }

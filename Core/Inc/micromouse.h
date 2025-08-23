@@ -128,28 +128,32 @@ typedef struct {
     int32_t left_total;
     int32_t right_total;
 } EncoderData;
+/* Units: distance in mm, velocity in mm/s, acceleration in mm/s^2, jerk in mm/s^3 */
+
 typedef struct {
-    // Profile parameters
-    float max_velocity;        // mm/s - Maximum velocity
-    float max_acceleration;    // mm/s² - Maximum acceleration
-    float max_jerk;           // mm/s³ - Maximum jerk
-    float target_distance;    // mm - Target distance to travel
+    /* Inputs (possibly adjusted internally for feasibility) */
+    float distance_mm;
+    float vmax;     // desired max vel
+    float amax;     // max accel (may be reduced if segment is very short)
+    float jmax;     // max jerk  (positive magnitude)
 
-    // Current state
-    float current_position;   // mm - Current position
-    float current_velocity;   // mm/s - Current velocity
-    float current_acceleration; // mm/s² - Current acceleration
-    float current_jerk;       // mm/s³ - Current jerk
+    /* Derived segment times (s): 7-segment jerk-limited profile */
+    float tj;       // jerk-up / jerk-down duration
+    float ta;       // constant acceleration duration (per half)
+    float tv;       // constant velocity (cruise) duration
 
-    // Time parameters
-    float t1, t2, t3, t4, t5, t6, t7; // 7-segment time durations
-    float total_time;         // Total profile time
-    uint32_t start_time;      // Profile start timestamp
+    /* State */
+    float t_elapsed;      // s
+    float t_total;        // s
+    float s;              // mm (integrated position)
+    float v;              // mm/s
+    float a;              // mm/s^2
+    float j;              // mm/s^3 (current commanded jerk)
+    int   phase;          // 1..7
+    bool  complete;
 
-    // Status
-    bool profile_active;
-    bool profile_complete;
-    uint8_t current_segment;  // 1-7 for each S-curve segment
+    /* Timing */
+    uint32_t last_update_ms;
 } SCurveProfile;
 
 
@@ -323,5 +327,13 @@ bool championship_move_forward_enhanced(void);
 void set_heading_pid_gains(float kp, float ki, float kd);
 void get_heading_pid_status(void);
 void test_scurve_movement(void);
+/* Encoder safe API */
+void update_encoder_totals(void);
+int32_t get_left_encoder_total(void);
+int32_t get_right_encoder_total(void);
+void reset_encoder_totals(void);
+
+/* Test helper used from main/test harness (if present) */
+void test_scurve_single_cell(void);
 
 #endif /* MICROMOUSE_H */

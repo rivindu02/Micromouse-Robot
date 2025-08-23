@@ -445,7 +445,7 @@ void moveStraightPID(void) {
 }
 
 // PID parameters for encoders
-float Kp_g =0.5; // Proportional term
+float Kp_g =10; // Proportional term
 float Ki_g = 0; // Integral term
 float Kd_g = 0; // Derivative term
 float error_g = 0;
@@ -463,8 +463,8 @@ void moveStraightGyroPID(void) {
 
 	float correction = (Kp_g * error_g) + (Ki_g * integral_g) + (Kd_g * derivative_g);
 
-	int motor1Speed = 600 + correction;
-	int motor2Speed = 610 - correction;
+	int motor1Speed = 400 - correction;
+	int motor2Speed = 400 + correction;
 
 	if (motor1Speed>1000){
 	  motor1Speed= 1000;
