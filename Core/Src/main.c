@@ -163,13 +163,13 @@ int main(void)
 
 	  // Set initial conservative PID gains
 	  set_heading_pid_gains(1.0f, 0.0f, 0.1f);
-	  while(1){
-		  mpu9250_read_all();
-		  mpu9250_get_gyro_z_dps();// get the raw reading from gyro
-		  mpu9250_send_status();
-		  HAL_Delay(500);
-
-	  }
+//	  while(1){
+//		  mpu9250_read_all();
+//		  mpu9250_get_gyro_z_dps();// get the raw reading from gyro
+//		  mpu9250_send_status();
+//		  HAL_Delay(500);
+//
+//	  }
 
 
   } else {
@@ -193,18 +193,18 @@ int main(void)
 //      send_bluetooth_message("❌ CRITICAL: All sensors reading zero - ADC failure!\r\n");
 //  }
 //
-//  // Test encoder functionality
-//  start_encoders();
-//  reset_encoder_totals();
-//  HAL_Delay(100);
-//
-//  while(get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
-//	  moveStraightPID();
-//	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
-//  }
-//  break_motors();
-//
-//  HAL_Delay(100);
+  // Test encoder functionality
+  start_encoders();
+  reset_encoder_totals();
+  HAL_Delay(100);
+
+  while(get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
+	  moveStraightPID();
+	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
+  }
+  break_motors();
+
+  HAL_Delay(100);
 
 
 //  debug_encoder_setup();
