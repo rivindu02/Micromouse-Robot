@@ -311,24 +311,27 @@ void turn_to_direction(int target_dir)
 
 
 /**
- * @brief Move robot forward one cell (MMS style)
+ * @brief Enhanced championship move forward with S-curve and gyro stabilization
  */
-bool championship_move_forward(void)
-{
-    update_sensors();// neww
-    // Check for wall before moving
-    if (sensors.wall_front) {
-        send_bluetooth_message("Front wall detected, cannot move\r\n");
-        return false;
+bool championship_move_forward(void) {
+    if (mpu9250_is_initialized()) {
+        // Use enhanced S-curve movement with gyro stabilization
+        return championship_move_forward_enhanced();
+    } else {
+        // Fallback to original movement if gyro not available
+        update_sensors();
+
+        if (sensors.wall_front) {
+            send_bluetooth_message("Front wall detected, cannot move\r\n");
+            return false;
+        }
+
+        move_forward();
+        robot.exploration_steps++;
+        exploration_steps++;
+        return true;
     }
-
-    move_forward();  	//move_forward_cell_scurve();
-    robot.exploration_steps++;
-    exploration_steps++;
-
-    return true;
 }
-
 /**
  * @brief Check if robot is at goal (MMS style)
  */

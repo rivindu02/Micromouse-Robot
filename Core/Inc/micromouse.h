@@ -314,14 +314,11 @@ void test_encoder_rotation(void);
 void move_forward_with_profile(float distance_mm, float max_speed);
 void move_forward_smooth(float distance_mm);
 
-/* enhanced_movement.c with s-curve */
+// Enhanced S-curve movement functions
 void move_forward_scurve(float distance_mm, float speed_multiplier);
-void turn_scurve(int turn_direction);
-void move_forward_cell_scurve(void);
-void turn_left_scurve(void);
-void turn_right_scurve(void);
-void turn_around_scurve(void);
-void move_forward_adaptive_scurve(float speed_multiplier);
-void send_scurve_movement_status(void);
+bool championship_move_forward_enhanced(void);
+void set_heading_pid_gains(float kp, float ki, float kd);
+void get_heading_pid_status(void);
+void test_scurve_movement(void);
 
 #endif /* MICROMOUSE_H */

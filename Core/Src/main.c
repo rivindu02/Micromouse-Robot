@@ -162,36 +162,48 @@ int main(void)
   adc_system_diagnostics();
 
   // Check gyro initialization
-  if (!mpu9250_is_initialized()) {
-      send_bluetooth_message("❌ CRITICAL: Gyroscope initialization failed!\r\n");
+  if (mpu9250_is_initialized()) {
+	  send_bluetooth_message("Calibrating gyro for heading control...\r\n");
+	  send_bluetooth_message("⚠️ KEEP ROBOT STATIONARY during calibration!\r\n");
+	  HAL_Delay(2000);  // Give user time to see message
+	  mpu9250_calibrate_bias();
+	  send_bluetooth_message("✅ Gyro calibration complete\r\n");
 
+	  // Set initial conservative PID gains
+	  set_heading_pid_gains(1.0f, 0.0f, 0.1f);
+  } else {
+	  send_bluetooth_message("⚠️ Gyro not available - using basic movement\r\n");
   }
-  mpu9250_calibrate_bias();
-  mpu9250_send_status();
+
+
+
+  //mpu9250_send_status();
+
+
+
+
+
 
 
   // Test ADC functionality
-  update_sensors();
-  if (sensors.battery == 0 && sensors.front_left == 0 &&
-      sensors.front_right == 0 && sensors.side_left == 0 && sensors.side_right == 0) {
-      send_bluetooth_message("❌ CRITICAL: All sensors reading zero - ADC failure!\r\n");
-  }
-
-  // Test encoder functionality
-  start_encoders();
-  reset_encoder_totals();
-//  int32_t left_test = get_left_encoder_total();
-//  int32_t right_test = get_right_encoder_total();
-  HAL_Delay(100);
-
-  while(get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
-	  moveStraightPID();
-	  //HAL_Delay(1);
-	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
-  }
-  break_motors();
-
-  HAL_Delay(100);
+//  update_sensors();
+//  if (sensors.battery == 0 && sensors.front_left == 0 &&
+//      sensors.front_right == 0 && sensors.side_left == 0 && sensors.side_right == 0) {
+//      send_bluetooth_message("❌ CRITICAL: All sensors reading zero - ADC failure!\r\n");
+//  }
+//
+//  // Test encoder functionality
+//  start_encoders();
+//  reset_encoder_totals();
+//  HAL_Delay(100);
+//
+//  while(get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
+//	  moveStraightPID();
+//	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
+//  }
+//  break_motors();
+//
+//  HAL_Delay(100);
 
 
 //  debug_encoder_setup();
@@ -262,23 +274,68 @@ int main(void)
 	  update_sensors();
 
 	  if (button_pressed == 1) {
-		  button_pressed = 0;
-		  // Left button - start speed run or new exploration
-		  if (robot.center_reached && robot.returned_to_start) {
-			  championship_speed_run(); // Championship speed run with MMS path
-		  } else {
-			  send_bluetooth_message("Starting new championship exploration...\r\n");
-			  reset_championship_micromouse();
-			  championship_exploration_with_analysis();
-		  }
-	  }
+	          button_pressed = 0;
+	          // Left button - start speed run or new exploration
+	          if (robot.center_reached && robot.returned_to_start) {
+	              championship_speed_run();
+	          } else {
+	              send_bluetooth_message("Starting enhanced championship exploration...\r\n");
+	              reset_championship_micromouse();
+	              championship_exploration_with_analysis();
+	          }
+	      }
 
 	  if (button_pressed == 2) {
 		  button_pressed = 0;
-		  // Right button - reset system
-		  reset_championship_micromouse();
-		  send_bluetooth_message("Championship system reset\r\n");
+
+		  // Right button - test S-curve movement or reset system
+		  static bool test_mode = false;
+
+		  if (!robot.center_reached && !robot.returned_to_start) {
+			  // If not exploring, allow testing
+			  test_mode = !test_mode;
+
+			  if (test_mode) {
+				  send_bluetooth_message("🧪 S-curve test mode - press LEFT for single cell test\r\n");
+			  } else {
+				  send_bluetooth_message("Test mode OFF\r\n");
+			  }
+		  } else {
+			  // Normal reset functionality
+			  reset_championship_micromouse();
+			  send_bluetooth_message("Championship system reset\r\n");
+		  }
 	  }
+
+	  // Add this for quick single-cell S-curve test
+	  static uint32_t last_button_check = 0;
+	  if (HAL_GetTick() - last_button_check > 100) { // Debounce
+		  last_button_check = HAL_GetTick();
+
+		  // Quick test: Both buttons pressed simultaneously for single cell test
+		  if (HAL_GPIO_ReadPin(BTN_LEFT_GPIO_Port, BTN_LEFT_Pin) == GPIO_PIN_RESET &&
+			  HAL_GPIO_ReadPin(BTN_RIGHT_GPIO_Port, BTN_RIGHT_Pin) == GPIO_PIN_RESET) {
+			  static uint32_t both_pressed_time = 0;
+			  if (both_pressed_time == 0) {
+				  both_pressed_time = HAL_GetTick();
+			  } else if (HAL_GetTick() - both_pressed_time > 1000) { // 1 second hold
+				  send_bluetooth_message("🧪 BOTH BUTTONS: Single cell S-curve test\r\n");
+				  test_scurve_single_cell();
+				  both_pressed_time = 0;
+
+				  // Reset button states
+				  button_pressed = 0;
+			  }
+		  } else {
+			  // Reset if buttons released
+			  static uint32_t both_pressed_time = 0;
+			  both_pressed_time = 0;
+		  }
+	  }
+
+
+
+
 
 	  // Send periodic status updates
 	  static uint32_t last_status = 0;

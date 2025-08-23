@@ -400,9 +400,9 @@ void move_forward_with_profile(float distance_mm, float max_speed) {
 }
 
 // PID parameters for encoders
-float Kp_e =0; // Proportional term
+float Kp_e =0.03; // Proportional term
 float Ki_e = 0; // Integral term
-float Kd_e = 0; // Derivative term
+float Kd_e = 0.1; // Derivative term
 float errorenco = 0;
 float previousErrorenco = 0;
 float integralenco = 0;
@@ -420,8 +420,8 @@ void moveStraightPID(void) {
 
 	float correction = (Kp_e * errorenco) + (Ki_e * integralenco) + (Kd_e * derivativeenco);
 
-	int motor1Speed = 600 - correction;
-	int motor2Speed = 600 + correction;
+	int motor1Speed = 500 + correction;
+	int motor2Speed = 510 - correction;
 
 	if (motor1Speed>1000){
 	  motor1Speed= 1000;
