@@ -147,54 +147,69 @@ int main(void)
   MX_TIM4_Init();
   MX_USART6_UART_Init();
   MX_TIM3_Init();
-
-
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);   // PA6  (MOTOR_IN1)
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);   // PA7  (MOTOR_IN2)
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);   // PB0  (MOTOR_IN3)
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);   // PB1  (MOTOR_IN4)
-  HAL_GPIO_WritePin(MOTOR_STBY_GPIO_Port, MOTOR_STBY_Pin, GPIO_PIN_SET); // wake DRV8833
-
   /* USER CODE BEGIN 2 */
   /* Initialize micromouse system */
   championship_micromouse_init();
   verify_adc_gpio_configuration();
-  calibrate_adc();
   adc_system_diagnostics();
 
   // Check gyro initialization
-  if (!mpu9250_is_initialized()) {
-      send_bluetooth_message("❌ CRITICAL: Gyroscope initialization failed!\r\n");
+  if (mpu9250_is_initialized()) {
+	  send_bluetooth_message("Calibrating gyro for heading control...\r\n");
+	  send_bluetooth_message("⚠️ KEEP ROBOT STATIONARY during calibration!\r\n");
+	  HAL_Delay(2000);  // Give user time to see message
+	  mpu9250_calibrate_bias();
+	  send_bluetooth_message("✅ Gyro calibration complete\r\n");
 
+	  // Set initial conservative PID gains
+	  set_heading_pid_gains(1.0f, 0.0f, 0.1f);
+  } else {
+	  send_bluetooth_message("⚠️ Gyro not available - using basic movement\r\n");
   }
-  mpu9250_calibrate_bias();
-  mpu9250_send_status();
+
+
+
+  //mpu9250_send_status();
+
+
+
+
+
 
 
   // Test ADC functionality
-  update_sensors();
-  if (sensors.battery == 0 && sensors.front_left == 0 &&
-      sensors.front_right == 0 && sensors.side_left == 0 && sensors.side_right == 0) {
-      send_bluetooth_message("❌ CRITICAL: All sensors reading zero - ADC failure!\r\n");
-  }
-
-  // Test encoder functionality
-  start_encoders();
-  int32_t left_test = get_left_encoder_total();
-  int32_t right_test = get_right_encoder_total();
-  HAL_Delay(100);
-
+//  update_sensors();
+//  if (sensors.battery == 0 && sensors.front_left == 0 &&
+//      sensors.front_right == 0 && sensors.side_left == 0 && sensors.side_right == 0) {
+//      send_bluetooth_message("❌ CRITICAL: All sensors reading zero - ADC failure!\r\n");
+//  }
 //
+//  // Test encoder functionality
+//  start_encoders();
+//  reset_encoder_totals();
+//  HAL_Delay(100);
+//
+//  while(get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
+//	  moveStraightPID();
+//	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
+//  }
+//  break_motors();
+//
+//  HAL_Delay(100);
+
+
 //  debug_encoder_setup();
 //  test_encoder_manual();
 //  test_encoder_rotation();
-  left_test = get_left_encoder_total();
-  right_test = get_right_encoder_total();
+//  left_test = get_left_encoder_total();
+//  right_test = get_right_encoder_total();
 
-  if (left_test == 0 && right_test == 0) {
+  if (get_left_encoder_total() == 0 && get_right_encoder_total() == 0) {
       send_bluetooth_message("⚠️ WARNING: Encoders may not be working\r\n");
       // Don't mark as critical failure - encoders might be stationary
   }
+
+
 
 
   /* Play startup tone */
@@ -214,11 +229,11 @@ int main(void)
 
   /* Wait for start button */
   send_bluetooth_message("Press button to start exploration...\r\n");
-  while (!start_flag) {
-      HAL_Delay(10);
-      // Blink LED to show ready state
-      HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin);
-  }
+//  while (!start_flag) {
+//      HAL_Delay(10);
+//      // Blink LED to show ready state
+//      HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin);
+//  }
 
   /* Reset LEDs */
   HAL_GPIO_WritePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin, GPIO_PIN_RESET);
@@ -234,9 +249,16 @@ int main(void)
   /* Initialize movement system */
   start_encoders();
   calibrate_sensors();
+  while(1){
+	  //update_sensors();
+	  diagnostic_sensor_test();
+	  HAL_Delay(500);
+  }
 
   /* Execute championship exploration */
   championship_exploration_with_analysis();
+  //test_scurve_single_cell();
+
 
   /* USER CODE END 2 */
 
@@ -250,24 +272,33 @@ int main(void)
 
 	  update_sensors();
 
+
 	  if (button_pressed == 1) {
-		  button_pressed = 0;
-		  // Left button - start speed run or new exploration
-		  if (robot.center_reached && robot.returned_to_start) {
-			  championship_speed_run(); // Championship speed run with MMS path
-		  } else {
-			  send_bluetooth_message("Starting new championship exploration...\r\n");
-			  reset_championship_micromouse();
-			  championship_exploration_with_analysis();
-		  }
-	  }
+	          button_pressed = 0;
+	          // Left button - start speed run or new exploration
+	          if (robot.center_reached && robot.returned_to_start) {
+	              championship_speed_run();
+	          } else {
+	              send_bluetooth_message("Starting enhanced championship exploration...\r\n");
+	              reset_championship_micromouse();
+	              championship_exploration_with_analysis();
+	          }
+	      }
 
 	  if (button_pressed == 2) {
 		  button_pressed = 0;
-		  // Right button - reset system
-		  reset_championship_micromouse();
-		  send_bluetooth_message("Championship system reset\r\n");
+
+		  // Right button - test S-curve movement or reset system
+		  test_scurve_single_cell();
+		  mpu9250_read_gyro();
+
+
 	  }
+
+
+
+
+
 
 	  // Send periodic status updates
 	  static uint32_t last_status = 0;
@@ -760,10 +791,10 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, Chip_Select_Pin|LED_LEFT_Pin|LED_RIGHT_Pin|EMIT_SIDE_RIGHT_Pin
-                          |EMIT_FRONT_RIGHT_Pin, GPIO_PIN_RESET);
+                          |EMIT_FRONT_LEFT_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, EMIT_FRONT_LEFT_Pin|EMIT_SIDE_LEFT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, EMIT_FRONT_RIGHT_Pin|EMIT_SIDE_LEFT_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : MOTOR_STBY_Pin */
   GPIO_InitStruct.Pin = MOTOR_STBY_Pin;
@@ -785,16 +816,16 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(BTN_RIGHT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : Chip_Select_Pin LED_LEFT_Pin LED_RIGHT_Pin EMIT_SIDE_RIGHT_Pin
-                           EMIT_FRONT_RIGHT_Pin */
+                           EMIT_FRONT_LEFT_Pin */
   GPIO_InitStruct.Pin = Chip_Select_Pin|LED_LEFT_Pin|LED_RIGHT_Pin|EMIT_SIDE_RIGHT_Pin
-                          |EMIT_FRONT_RIGHT_Pin;
+                          |EMIT_FRONT_LEFT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : EMIT_FRONT_LEFT_Pin EMIT_SIDE_LEFT_Pin */
-  GPIO_InitStruct.Pin = EMIT_FRONT_LEFT_Pin|EMIT_SIDE_LEFT_Pin;
+  /*Configure GPIO pins : EMIT_FRONT_RIGHT_Pin EMIT_SIDE_LEFT_Pin */
+  GPIO_InitStruct.Pin = EMIT_FRONT_RIGHT_Pin|EMIT_SIDE_LEFT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
@@ -862,22 +893,6 @@ void verify_adc_gpio_configuration(void) {
     send_bluetooth_message("✅ ADC GPIO configuration verified\r\n");
 }
 
-// Add this after MX_ADC1_Init() in main()
-void calibrate_adc(void) {
-    send_bluetooth_message("Calibrating ADC1...\r\n");
-
-    // For STM32F4, use offset calibration if available
-    // Note: STM32F4 doesn't have automatic calibration like F3/L4
-    // But we can do manual offset calibration
-
-    // Ensure ADC is powered up
-    if (HAL_ADC_Init(&hadc1) != HAL_OK) {
-        send_bluetooth_message("❌ ADC initialization failed!\r\n");
-        return;
-    }
-
-    send_bluetooth_message("✅ ADC calibration completed\r\n");
-}
 
 /* USER CODE END 4 */
 
