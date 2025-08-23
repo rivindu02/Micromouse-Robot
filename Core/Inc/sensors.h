@@ -12,5 +12,5 @@ void adc_system_diagnostics(void);
 uint16_t get_calibrated_threshold(int sensor_index);
 bool is_sensor_calibration_valid(void);
 void send_detailed_sensor_status(void);
-
+void diagnostic_sensor_test();
 #endif

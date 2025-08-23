@@ -73,8 +73,8 @@ void Error_Handler(void);
 #define Gyro_ADO_GPIO_Port GPIOB
 #define Gyro_SDA_Pin GPIO_PIN_15
 #define Gyro_SDA_GPIO_Port GPIOB
-#define EMIT_FRONT_LEFT_Pin GPIO_PIN_8
-#define EMIT_FRONT_LEFT_GPIO_Port GPIOA
+#define EMIT_FRONT_RIGHT_Pin GPIO_PIN_8
+#define EMIT_FRONT_RIGHT_GPIO_Port GPIOA
 #define EMIT_SIDE_LEFT_Pin GPIO_PIN_9
 #define EMIT_SIDE_LEFT_GPIO_Port GPIOA
 #define speaker_PWM_Pin GPIO_PIN_10
@@ -97,8 +97,8 @@ void Error_Handler(void);
 #define Right_EncoderB_GPIO_Port GPIOB
 #define EMIT_SIDE_RIGHT_Pin GPIO_PIN_8
 #define EMIT_SIDE_RIGHT_GPIO_Port GPIOB
-#define EMIT_FRONT_RIGHT_Pin GPIO_PIN_9
-#define EMIT_FRONT_RIGHT_GPIO_Port GPIOB
+#define EMIT_FRONT_LEFT_Pin GPIO_PIN_9
+#define EMIT_FRONT_LEFT_GPIO_Port GPIOB
 
 /* USER CODE BEGIN Private defines */
 /* USER CODE END Private defines */

@@ -99,7 +99,7 @@ void update_sensors(void)
 {
     // Read ambient light levels (emitters off)
     turn_off_emitters();
-    HAL_Delay(1);
+    HAL_Delay(5);
     uint16_t ambient_front_right = read_adc_channel(ADC_CHANNEL_2);
     uint16_t ambient_side_right = read_adc_channel(ADC_CHANNEL_3);
     uint16_t ambient_side_left = read_adc_channel(ADC_CHANNEL_4);
@@ -293,6 +293,46 @@ void adc_system_diagnostics(void) {
 
     send_bluetooth_message("===============================\r\n");
 }
+
+// Add this function to sensors.c for debugging
+void diagnostic_sensor_test(void) {
+    send_bluetooth_message("\r\n=== IR SENSOR DIAGNOSTIC ===\r\n");
+
+    // Test each emitter-detector pair individually
+    const char* sensor_names[] = {"Front Left", "Front Right", "Side Left", "Side Right"};
+    uint32_t channels[] = {ADC_CHANNEL_5, ADC_CHANNEL_2, ADC_CHANNEL_4, ADC_CHANNEL_3};
+    GPIO_TypeDef* emit_ports[] = {EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_RIGHT_GPIO_Port,
+                                  EMIT_SIDE_LEFT_GPIO_Port, EMIT_SIDE_RIGHT_GPIO_Port};
+    uint16_t emit_pins[] = {EMIT_FRONT_LEFT_Pin, EMIT_FRONT_RIGHT_Pin,
+                           EMIT_SIDE_LEFT_Pin, EMIT_SIDE_RIGHT_Pin};
+
+    for(int i = 0; i < 4; i++) {
+        // Test with emitter OFF
+        HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_RESET);
+        HAL_Delay(10);
+        uint16_t off_reading = read_adc_channel(channels[i]);
+
+        // Test with emitter ON
+        HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_SET);
+        HAL_Delay(10);
+        uint16_t on_reading = read_adc_channel(channels[i]);
+
+
+
+        // Calculate difference
+        int16_t difference = on_reading - off_reading;
+
+        send_bluetooth_printf("%s: OFF=%d, ON=%d, DIFF=%d\r\n",
+                             sensor_names[i], off_reading, on_reading, difference);
+
+        // Turn off emitter
+        HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_RESET);
+        HAL_Delay(50);
+    }
+
+    send_bluetooth_message("=== Place hand/object 5cm from sensor and retest ===\r\n");
+}
+
 
 /**
  * @brief Enhanced sensor calibration - replaces main.c ADC test code

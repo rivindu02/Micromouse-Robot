@@ -208,9 +208,10 @@ void move_forward_scurve(float distance_mm, float speed_multiplier) {
         if (left_pwm > PWM_MAX) left_pwm = PWM_MAX;
         if (right_pwm > PWM_MAX) right_pwm = PWM_MAX;
 
-        // Command motors using existing motor_set function
-        motor_set(TIM_CHANNEL_1, MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, true, (uint16_t)left_pwm);
-        motor_set(TIM_CHANNEL_3, MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, true, (uint16_t)right_pwm);
+
+    	motor_set_fixed(0, true, (uint16_t)left_pwm);//Left
+
+    	motor_set_fixed(1, true, (uint16_t)right_pwm);//Right
 
         HAL_Delay(MOVEMENT_UPDATE_PERIOD_MS);
     }

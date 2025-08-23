@@ -47,14 +47,14 @@
 #define TONE_ERROR 220
 
 /* Pin definitions (matching your PCB) */
-#define EMIT_FRONT_LEFT_Pin GPIO_PIN_8
-#define EMIT_FRONT_LEFT_GPIO_Port GPIOA
+#define EMIT_FRONT_LEFT_Pin GPIO_PIN_9
+#define EMIT_FRONT_LEFT_GPIO_Port GPIOB
 #define EMIT_SIDE_LEFT_Pin GPIO_PIN_9
 #define EMIT_SIDE_LEFT_GPIO_Port GPIOA
 #define EMIT_SIDE_RIGHT_Pin GPIO_PIN_8
 #define EMIT_SIDE_RIGHT_GPIO_Port GPIOB
-#define EMIT_FRONT_RIGHT_Pin GPIO_PIN_9
-#define EMIT_FRONT_RIGHT_GPIO_Port GPIOB
+#define EMIT_FRONT_RIGHT_Pin GPIO_PIN_8
+#define EMIT_FRONT_RIGHT_GPIO_Port GPIOA
 
 #define LED_LEFT_Pin GPIO_PIN_4
 #define LED_LEFT_GPIO_Port GPIOB
@@ -225,6 +225,7 @@ void adc_system_diagnostics(void);
 uint16_t get_calibrated_threshold(int sensor_index);
 bool is_sensor_calibration_valid(void);
 void send_detailed_sensor_status(void);
+void diagnostic_sensor_test();
 
 /* Gyroscope functions */
 bool mpu9250_init(void);
@@ -305,6 +306,7 @@ int get_speed_run_optimal_distance(void);
 bool mpu9250_is_initialized(void);
 void mpu9250_send_status(void);
 void send_encoder_status(void);
+
 
 void debug_encoder_setup(void);
 void test_encoder_manual(void);

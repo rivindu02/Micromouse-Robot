@@ -4,8 +4,8 @@
 ../Core/Src/enhanced_movement.c:71:17:scurve_velocity_to_pwm	1
 ../Core/Src/enhanced_movement.c:81:13:scurve_get_optimal_parameters	5
 ../Core/Src/enhanced_movement.c:104:6:move_forward_scurve	16
-../Core/Src/enhanced_movement.c:236:6:championship_move_forward_enhanced	6
-../Core/Src/enhanced_movement.c:267:6:set_heading_pid_gains	1
-../Core/Src/enhanced_movement.c:278:6:get_heading_pid_status	1
-../Core/Src/enhanced_movement.c:288:6:test_scurve_movement	8
-../Core/Src/enhanced_movement.c:345:6:test_scurve_single_cell	2
+../Core/Src/enhanced_movement.c:237:6:championship_move_forward_enhanced	6
+../Core/Src/enhanced_movement.c:268:6:set_heading_pid_gains	1
+../Core/Src/enhanced_movement.c:279:6:get_heading_pid_status	1
+../Core/Src/enhanced_movement.c:289:6:test_scurve_movement	8
+../Core/Src/enhanced_movement.c:346:6:test_scurve_single_cell	2

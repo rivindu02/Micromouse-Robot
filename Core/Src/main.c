@@ -147,14 +147,6 @@ int main(void)
   MX_TIM4_Init();
   MX_USART6_UART_Init();
   MX_TIM3_Init();
-
-
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);   // PA6  (MOTOR_IN1)
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);   // PA7  (MOTOR_IN2)
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);   // PB0  (MOTOR_IN3)
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);   // PB1  (MOTOR_IN4)
-  HAL_GPIO_WritePin(MOTOR_STBY_GPIO_Port, MOTOR_STBY_Pin, GPIO_PIN_SET); // wake DRV8833
-
   /* USER CODE BEGIN 2 */
   /* Initialize micromouse system */
   championship_micromouse_init();
@@ -237,11 +229,11 @@ int main(void)
 
   /* Wait for start button */
   send_bluetooth_message("Press button to start exploration...\r\n");
-  while (!start_flag) {
-      HAL_Delay(10);
-      // Blink LED to show ready state
-      HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin);
-  }
+//  while (!start_flag) {
+//      HAL_Delay(10);
+//      // Blink LED to show ready state
+//      HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin);
+//  }
 
   /* Reset LEDs */
   HAL_GPIO_WritePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin, GPIO_PIN_RESET);
@@ -257,9 +249,16 @@ int main(void)
   /* Initialize movement system */
   start_encoders();
   calibrate_sensors();
+  while(1){
+	  //update_sensors();
+	  diagnostic_sensor_test();
+	  HAL_Delay(500);
+  }
 
   /* Execute championship exploration */
   championship_exploration_with_analysis();
+  //test_scurve_single_cell();
+
 
   /* USER CODE END 2 */
 
@@ -272,6 +271,7 @@ int main(void)
     /* USER CODE BEGIN 3 */
 
 	  update_sensors();
+
 
 	  if (button_pressed == 1) {
 	          button_pressed = 0;
@@ -289,49 +289,12 @@ int main(void)
 		  button_pressed = 0;
 
 		  // Right button - test S-curve movement or reset system
-		  static bool test_mode = false;
+		  test_scurve_single_cell();
+		  mpu9250_read_gyro();
 
-		  if (!robot.center_reached && !robot.returned_to_start) {
-			  // If not exploring, allow testing
-			  test_mode = !test_mode;
 
-			  if (test_mode) {
-				  send_bluetooth_message("🧪 S-curve test mode - press LEFT for single cell test\r\n");
-			  } else {
-				  send_bluetooth_message("Test mode OFF\r\n");
-			  }
-		  } else {
-			  // Normal reset functionality
-			  reset_championship_micromouse();
-			  send_bluetooth_message("Championship system reset\r\n");
-		  }
 	  }
 
-	  // Add this for quick single-cell S-curve test
-	  static uint32_t last_button_check = 0;
-	  if (HAL_GetTick() - last_button_check > 100) { // Debounce
-		  last_button_check = HAL_GetTick();
-
-		  // Quick test: Both buttons pressed simultaneously for single cell test
-		  if (HAL_GPIO_ReadPin(BTN_LEFT_GPIO_Port, BTN_LEFT_Pin) == GPIO_PIN_RESET &&
-			  HAL_GPIO_ReadPin(BTN_RIGHT_GPIO_Port, BTN_RIGHT_Pin) == GPIO_PIN_RESET) {
-			  static uint32_t both_pressed_time = 0;
-			  if (both_pressed_time == 0) {
-				  both_pressed_time = HAL_GetTick();
-			  } else if (HAL_GetTick() - both_pressed_time > 1000) { // 1 second hold
-				  send_bluetooth_message("🧪 BOTH BUTTONS: Single cell S-curve test\r\n");
-				  test_scurve_single_cell();
-				  both_pressed_time = 0;
-
-				  // Reset button states
-				  button_pressed = 0;
-			  }
-		  } else {
-			  // Reset if buttons released
-			  static uint32_t both_pressed_time = 0;
-			  both_pressed_time = 0;
-		  }
-	  }
 
 
 
@@ -828,10 +791,10 @@ static void MX_GPIO_Init(void)
 
   /*Configure GPIO pin Output Level */
   HAL_GPIO_WritePin(GPIOB, Chip_Select_Pin|LED_LEFT_Pin|LED_RIGHT_Pin|EMIT_SIDE_RIGHT_Pin
-                          |EMIT_FRONT_RIGHT_Pin, GPIO_PIN_RESET);
+                          |EMIT_FRONT_LEFT_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin Output Level */
-  HAL_GPIO_WritePin(GPIOA, EMIT_FRONT_LEFT_Pin|EMIT_SIDE_LEFT_Pin, GPIO_PIN_RESET);
+  HAL_GPIO_WritePin(GPIOA, EMIT_FRONT_RIGHT_Pin|EMIT_SIDE_LEFT_Pin, GPIO_PIN_RESET);
 
   /*Configure GPIO pin : MOTOR_STBY_Pin */
   GPIO_InitStruct.Pin = MOTOR_STBY_Pin;
@@ -853,16 +816,16 @@ static void MX_GPIO_Init(void)
   HAL_GPIO_Init(BTN_RIGHT_GPIO_Port, &GPIO_InitStruct);
 
   /*Configure GPIO pins : Chip_Select_Pin LED_LEFT_Pin LED_RIGHT_Pin EMIT_SIDE_RIGHT_Pin
-                           EMIT_FRONT_RIGHT_Pin */
+                           EMIT_FRONT_LEFT_Pin */
   GPIO_InitStruct.Pin = Chip_Select_Pin|LED_LEFT_Pin|LED_RIGHT_Pin|EMIT_SIDE_RIGHT_Pin
-                          |EMIT_FRONT_RIGHT_Pin;
+                          |EMIT_FRONT_LEFT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOB, &GPIO_InitStruct);
 
-  /*Configure GPIO pins : EMIT_FRONT_LEFT_Pin EMIT_SIDE_LEFT_Pin */
-  GPIO_InitStruct.Pin = EMIT_FRONT_LEFT_Pin|EMIT_SIDE_LEFT_Pin;
+  /*Configure GPIO pins : EMIT_FRONT_RIGHT_Pin EMIT_SIDE_LEFT_Pin */
+  GPIO_InitStruct.Pin = EMIT_FRONT_RIGHT_Pin|EMIT_SIDE_LEFT_Pin;
   GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
   GPIO_InitStruct.Pull = GPIO_NOPULL;
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
