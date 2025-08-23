@@ -211,6 +211,7 @@ void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool for
 void test_motors_individual(void);
 void motor_set_fixed(uint8_t motor, bool forward, uint16_t duty);
 void moveStraightPID(void);
+void moveStraightGyroPID(void);
 
 /* Sensor functions */
 void calibrate_sensors(void);

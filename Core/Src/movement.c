@@ -400,25 +400,25 @@ void move_forward_with_profile(float distance_mm, float max_speed) {
 }
 
 // PID parameters for encoders
-float Kp_e =0.03; // Proportional term
+float Kp_e =0.02; // Proportional term
 float Ki_e = 0; // Integral term
 float Kd_e = 0.1; // Derivative term
-float errorenco = 0;
-float previousErrorenco = 0;
-float integralenco = 0;
-float derivativeenco = 0;
+float error_e = 0;
+float previousError_e = 0;
+float integral_e = 0;
+float derivative_e = 0;
 /*
  * Encoder PID
  * */
 void moveStraightPID(void) {
 	left_total=get_left_encoder_total();
 	left_total=get_left_encoder_total();
-	errorenco = left_total - right_total;
+	error_e = left_total - right_total;
 
-	integralenco += errorenco;
-	derivativeenco = errorenco - previousErrorenco;
+	integral_e += error_e;
+	derivative_e = error_e - previousError_e;
 
-	float correction = (Kp_e * errorenco) + (Ki_e * integralenco) + (Kd_e * derivativeenco);
+	float correction = (Kp_e * error_e) + (Ki_e * integral_e) + (Kd_e * derivative_e);
 
 	int motor1Speed = 500 + correction;
 	int motor2Speed = 510 - correction;
@@ -441,8 +441,52 @@ void moveStraightPID(void) {
 	motor_set_fixed(1, true, motor1Speed);//Right
 
 
-	previousErrorenco = errorenco;
+	previousError_e = error_e;
 }
+
+// PID parameters for encoders
+float Kp_g =0.5; // Proportional term
+float Ki_g = 0; // Integral term
+float Kd_g = 0; // Derivative term
+float error_g = 0;
+float previousError_g = 0;
+float integral_g = 0;
+float derivative_g = 0;
+/*
+ * Encoder PID
+ * */
+void moveStraightGyroPID(void) {
+	error_g = mpu9250_get_gyro_z_compensated();
+
+	integral_g += error_g;
+	derivative_g = error_g - previousError_g;
+
+	float correction = (Kp_g * error_g) + (Ki_g * integral_g) + (Kd_g * derivative_g);
+
+	int motor1Speed = 600 + correction;
+	int motor2Speed = 610 - correction;
+
+	if (motor1Speed>1000){
+	  motor1Speed= 1000;
+	};
+	if (motor2Speed>1000){
+	  motor2Speed= 1000;
+	};
+	if (motor1Speed<0){
+	  motor1Speed= 0;
+	};
+	if (motor2Speed<0){
+	  motor2Speed= 0;
+	};
+
+	motor_set_fixed(0, true, motor2Speed);//Left
+
+	motor_set_fixed(1, true, motor1Speed);//Right
+
+
+	previousError_g = error_g;
+}
+
 
 /**
  * @brief Simple smooth movement for one cell

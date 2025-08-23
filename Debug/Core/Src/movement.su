@@ -18,7 +18,8 @@
 ../Core/Src/movement.c:354:6:send_encoder_status	16	static
 ../Core/Src/movement.c:364:6:move_forward_with_profile	88	static
 ../Core/Src/movement.c:413:6:moveStraightPID	24	static
-../Core/Src/movement.c:450:6:move_forward_smooth	16	static
-../Core/Src/movement.c:455:6:debug_encoder_setup	8	static
-../Core/Src/movement.c:478:6:test_encoder_manual	8	static
-../Core/Src/movement.c:491:6:test_encoder_rotation	32	static
+../Core/Src/movement.c:458:6:moveStraightGyroPID	24	static
+../Core/Src/movement.c:494:6:move_forward_smooth	16	static
+../Core/Src/movement.c:499:6:debug_encoder_setup	8	static
+../Core/Src/movement.c:522:6:test_encoder_manual	8	static
+../Core/Src/movement.c:535:6:test_encoder_rotation	32	static
