@@ -31,7 +31,7 @@
 #define BASE_SPEED 150
 #define TURN_SPEED 100
 #define MAX_SPEED 255
-#define ENCODER_COUNTS_PER_CELL 1000
+#define ENCODER_COUNTS_PER_CELL 1461		// Updated
 #define ENCODER_COUNTS_PER_TURN 500
 
 /* Sensor thresholds */
@@ -216,6 +216,7 @@ void test_motors_individual(void);
 void motor_set_fixed(uint8_t motor, bool forward, uint16_t duty);
 void moveStraightPID(void);
 void moveStraightGyroPID(void);
+void moveStraightGyroPID_Reset(void);
 
 /* Sensor functions */
 void calibrate_sensors(void);

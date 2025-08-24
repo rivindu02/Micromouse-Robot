@@ -227,14 +227,16 @@ void move_forward_distance(int distance_mm) {
     // FIXED: Use safe encoder reading
     int32_t start_left = get_left_encoder_total();
     int32_t start_right = get_right_encoder_total();
-
+    reset_encoder_totals();
     // Set motors to move forward
-    HAL_GPIO_WritePin(MOTOR_IN1_GPIO_Port, MOTOR_IN1_Pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(MOTOR_IN3_GPIO_Port, MOTOR_IN3_Pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, GPIO_PIN_RESET);
+//    HAL_GPIO_WritePin(MOTOR_IN1_GPIO_Port, MOTOR_IN1_Pin, GPIO_PIN_SET);
+//    HAL_GPIO_WritePin(MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, GPIO_PIN_RESET);
+//    HAL_GPIO_WritePin(MOTOR_IN3_GPIO_Port, MOTOR_IN3_Pin, GPIO_PIN_SET);
+//    HAL_GPIO_WritePin(MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, GPIO_PIN_RESET);
 
     while (1) {
+    	mpu9250_read_gyro();
+    	moveStraightGyroPID();
         int32_t current_left = get_left_encoder_total();
         int32_t current_right = get_right_encoder_total();
         int32_t left_traveled = current_left - start_left;
@@ -444,50 +446,122 @@ void moveStraightPID(void) {
 	previousError_e = error_e;
 }
 
-// PID parameters for encoders
-float Kp_g =10; // Proportional term
+// PID parameters for gyro
+float Kp_g = 6; // Proportional term
 float Ki_g = 0; // Integral term
-float Kd_g = 0; // Derivative term
-float error_g = 0;
-float previousError_g = 0;
-float integral_g = 0;
-float derivative_g = 0;
+float Kd_g = 0.5; // Derivative term
+//float error_g = 0;
+//float previousError_g = 0;
+//float integral_g = 0;
+//float derivative_g = 0;
+/* ----- Internal PID state (file-static) ----- */
+static float pid_error_prev = 0.0f;      // previous error (for derivative)
+static float pid_integral = 0.0f;        // integrated error (with dt)
+static float pid_deriv_filt = 0.0f;      // filtered derivative
+static uint32_t pid_last_ms = 0;         // last time stamp
+
+/* Derivative low-pass filter: alpha in [0..1], bigger => more smoothing */
+static const float DERIV_FILTER_ALPHA = 0.85f;
+
+/* Integral clamp (anti-windup) */
+static const float INTEGRAL_LIMIT = 2000.0f; // tune as needed (units: deg/s * s)
+
+/* Motor pwm constraints */
+static const int PWM_MIN = 0;
+
+
+/* Helper: clamp float */
+static inline float clampf_local(float v, float lo, float hi) {
+    return (v < lo) ? lo : (v > hi) ? hi : v;
+}
+
+/* Call this once immediately before starting a straight movement */
+void moveStraightGyroPID_Reset(void) {
+    pid_error_prev = 0.0f;
+    pid_integral = 0.0f;
+    pid_deriv_filt = 0.0f;
+    pid_last_ms = HAL_GetTick();
+}
+
 /*
  * Encoder PID
  * */
+//void moveStraightGyroPID(void) {
+//	error_g = mpu9250_get_gyro_z_compensated();
+//
+//	integral_g += error_g;
+//	derivative_g = error_g - previousError_g;
+//
+//	float correction = (Kp_g * error_g) + (Ki_g * integral_g) + (Kd_g * derivative_g);
+//
+//	int motor1Speed = 500 - correction;
+//	int motor2Speed = 500 + correction;
+//
+//	if (motor1Speed>1000){
+//	  motor1Speed= 750;
+//	};
+//	if (motor2Speed>1000){
+//	  motor2Speed= 750;
+//	};
+//	if (motor1Speed<0){
+//	  motor1Speed= 0;
+//	};
+//	if (motor2Speed<0){
+//	  motor2Speed= 0;
+//	};
+//
+//	motor_set_fixed(0, true, motor2Speed);//Left
+//
+//	motor_set_fixed(1, true, motor1Speed);//Right
+//
+//
+//	previousError_g = error_g;
+//}
+
 void moveStraightGyroPID(void) {
-	error_g = mpu9250_get_gyro_z_compensated();
+    uint32_t now = HAL_GetTick();
+    float dt = (now - pid_last_ms) / 1000.0f;
+    if (dt <= 0.0f) dt = 0.001f; // safety small dt if HAL tick didn't advance
+    pid_last_ms = now;
 
-	integral_g += error_g;
-	derivative_g = error_g - previousError_g;
+    /* READ: your gyro rate (deg/s). Keep original sign convention:
+       original code used error_g = mpu9250_get_gyro_z_compensated();
+       and motor1 = base - correction; motor2 = base + correction;
+       so we preserve that mapping for compatibility. */
+    float error = mpu9250_get_gyro_z_compensated();
 
-	float correction = (Kp_g * error_g) + (Ki_g * integral_g) + (Kd_g * derivative_g);
+    /* Integral (with dt) + anti-windup clamp */
+    pid_integral += error * dt;
+    pid_integral = clampf_local(pid_integral, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
 
-	int motor1Speed = 400 - correction;
-	int motor2Speed = 400 + correction;
+    /* Derivative (on error) and low-pass filter */
+    float deriv_raw = (error - pid_error_prev) / dt;    // d(error)/dt
+    pid_deriv_filt = DERIV_FILTER_ALPHA * pid_deriv_filt + (1.0f - DERIV_FILTER_ALPHA) * deriv_raw;
 
-	if (motor1Speed>1000){
-	  motor1Speed= 1000;
-	};
-	if (motor2Speed>1000){
-	  motor2Speed= 1000;
-	};
-	if (motor1Speed<0){
-	  motor1Speed= 0;
-	};
-	if (motor2Speed<0){
-	  motor2Speed= 0;
-	};
+    /* PID output (correction) */
+    float correction = (Kp_g * error) + (Ki_g * pid_integral) + (Kd_g * pid_deriv_filt);
 
-	motor_set_fixed(0, true, motor2Speed);//Left
+    /* Base PWM for forward motion (adjust to your nominal cruising PWM) */
+    const int base_pwm = 500;
 
-	motor_set_fixed(1, true, motor1Speed);//Right
+    int motor1Speed = (int)roundf((float)base_pwm - correction); // right wheel in your mapping
+    int motor2Speed = (int)roundf((float)base_pwm + correction); // left wheel
+
+    /* Clamp PWM outputs (and provide a safe top, not full 1000 if you prefer) */
+    if (motor1Speed > 700) motor1Speed = 700;
+    if (motor2Speed > 700) motor2Speed = 700;
+    if (motor1Speed < 0) motor1Speed = 0;
+    if (motor2Speed < 0) motor2Speed = 0;
 
 
-	previousError_g = error_g;
+
+    /* Set motors: adjust direction flags if your wiring uses opposite logic */
+    motor_set_fixed(0, true, motor2Speed); // Left
+    motor_set_fixed(1, true, motor1Speed); // Right
+
+    /* store previous error for next derivative computation */
+    pid_error_prev = error;
 }
-
-
 /**
  * @brief Simple smooth movement for one cell
  */
@@ -547,8 +621,8 @@ void test_encoder_rotation(void) {
     for(int i = 0; i < 20; i++) {
         uint16_t left_raw = TIM2->CNT;
         uint16_t right_raw = TIM4->CNT;
-        int32_t left_total = get_left_encoder_total()-31768;
-        int32_t right_total = get_right_encoder_total()+30768;
+        int32_t left_total = get_left_encoder_total();
+        int32_t right_total = get_right_encoder_total();
 
         send_bluetooth_printf("T+%ds: Raw L:%d R:%d | Total L:%ld R:%ld\r\n",
                              i/2, left_raw, right_raw, left_total, right_total);

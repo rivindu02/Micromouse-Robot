@@ -203,8 +203,8 @@ int main(void)
 //
   // Test encoder functionality
   start_encoders();
-  reset_encoder_totals();
   HAL_Delay(100);
+  moveStraightGyroPID_Reset();
 
   while(1){//get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
 	  mpu9250_read_gyro();
@@ -219,8 +219,7 @@ int main(void)
 //  debug_encoder_setup();
 //  test_encoder_manual();
 //  test_encoder_rotation();
-//  left_test = get_left_encoder_total();
-//  right_test = get_right_encoder_total();
+
 
   if (get_left_encoder_total() == 0 && get_right_encoder_total() == 0) {
       send_bluetooth_message("⚠️ WARNING: Encoders may not be working\r\n");

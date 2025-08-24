@@ -13,6 +13,7 @@ void move_forward_adaptive_speed(float speed_multiplier);
 void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool forward, uint16_t duty);
 void moveStraightPID(void);
 void moveStraightGyroPID(void);
+void moveStraightGyroPID_Reset(void);
 
 // Enhanced encoder functions
 int32_t get_left_encoder_total(void);
