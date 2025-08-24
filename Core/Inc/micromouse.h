@@ -245,7 +245,6 @@ bool mpu9250_detect_turn(void);
 void mpu9250_calibrate_bias(void);
 float mpu9250_get_gyro_z_compensated(void);
 bool gyro_turn_to_angle(float target_angle);
-static float gyro_rate_pid_step(float setpoint_deg_s, float measurement_deg_s);
 
 
 /* Audio functions */

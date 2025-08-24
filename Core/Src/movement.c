@@ -8,6 +8,7 @@
 
 #include "micromouse.h"
 #include "velocity_profile.h"
+#include "movement.h"
 #include <stdlib.h> // for abs() function
 
 // FIXED: Add static variables for proper encoder overflow tracking
@@ -136,56 +137,67 @@ void move_forward(void)
 /**
  * @brief Turn left 90 degrees - FIXED VERSION (removed unused variables)
  */
+//void turn_left(void) {
+//    // REMOVED: unused variable 'start_left'
+//    int32_t start_right = get_right_encoder_total();
+//
+//
+//    // Left motor reverse, right motor forward
+//	motor_set_fixed(0, false, 800); // Left reverse
+//	motor_set_fixed(1, true, 800);  // Right forward
+//
+//    int32_t target_counts = ENCODER_COUNTS_PER_TURN;
+//    while (1) {
+//        int32_t current_right = get_right_encoder_total();
+//        int32_t right_traveled = abs(current_right - start_right);
+//
+//        if (right_traveled >= target_counts) {
+//            break;
+//        }
+//        HAL_Delay(1);
+//    }
+//
+//    stop_motors();
+//    robot.direction = (robot.direction + 3) % 4; // Turn left
+//    HAL_Delay(200);
+//}
+//
+///**
+// * @brief Turn right 90 degrees - FIXED VERSION (removed unused variables)
+// */
+//void turn_right(void) {
+//    int32_t start_left = get_left_encoder_total();
+//    // REMOVED: unused variable 'start_right'
+//
+//    // Left motor forward, right motor backward
+//    motor_set_fixed(0, true, 800);  // Left forward
+//    motor_set_fixed(1, false, 800); // Right reverse
+//
+//    int32_t target_counts = ENCODER_COUNTS_PER_TURN;
+//    while (1) {
+//        int32_t current_left = get_left_encoder_total();
+//        int32_t left_traveled = abs(current_left - start_left);
+//
+//        if (left_traveled >= target_counts) {
+//            break;
+//        }
+//        HAL_Delay(1);
+//    }
+//
+//    stop_motors();
+//    robot.direction = (robot.direction + 1) % 4; // Turn right
+//    HAL_Delay(200);
+//}
+
 void turn_left(void) {
-    // REMOVED: unused variable 'start_left'
-    int32_t start_right = get_right_encoder_total();
-
-
-    // Left motor reverse, right motor forward
-	motor_set_fixed(0, false, 800); // Left reverse
-	motor_set_fixed(1, true, 800);  // Right forward
-
-    int32_t target_counts = ENCODER_COUNTS_PER_TURN;
-    while (1) {
-        int32_t current_right = get_right_encoder_total();
-        int32_t right_traveled = abs(current_right - start_right);
-
-        if (right_traveled >= target_counts) {
-            break;
-        }
-        HAL_Delay(1);
-    }
-
-    stop_motors();
-    robot.direction = (robot.direction + 3) % 4; // Turn left
-    HAL_Delay(200);
+    // turn 90 degrees left using gyro PID, 1200 ms timeout for safety
+    turn_in_place_gyro(+90.0f, 520, 1200);
+    robot.direction = (robot.direction + 3) % 4;
 }
 
-/**
- * @brief Turn right 90 degrees - FIXED VERSION (removed unused variables)
- */
 void turn_right(void) {
-    int32_t start_left = get_left_encoder_total();
-    // REMOVED: unused variable 'start_right'
-
-    // Left motor forward, right motor backward
-    motor_set_fixed(0, true, 800);  // Left forward
-    motor_set_fixed(1, false, 800); // Right reverse
-
-    int32_t target_counts = ENCODER_COUNTS_PER_TURN;
-    while (1) {
-        int32_t current_left = get_left_encoder_total();
-        int32_t left_traveled = abs(current_left - start_left);
-
-        if (left_traveled >= target_counts) {
-            break;
-        }
-        HAL_Delay(1);
-    }
-
-    stop_motors();
-    robot.direction = (robot.direction + 1) % 4; // Turn right
-    HAL_Delay(200);
+    turn_in_place_gyro(-90.0f, 520, 1200);
+    robot.direction = (robot.direction + 1) % 4;
 }
 
 /**
@@ -447,9 +459,9 @@ void moveStraightPID(void) {
 }
 
 // PID parameters for gyro
-float Kp_g = 6; // Proportional term
+float Kp_g = 6.4; // Proportional term
 float Ki_g = 0; // Integral term
-float Kd_g = 0.5; // Derivative term
+float Kd_g = 2; // Derivative term
 //float error_g = 0;
 //float previousError_g = 0;
 //float integral_g = 0;
@@ -466,8 +478,7 @@ static const float DERIV_FILTER_ALPHA = 0.85f;
 /* Integral clamp (anti-windup) */
 static const float INTEGRAL_LIMIT = 2000.0f; // tune as needed (units: deg/s * s)
 
-/* Motor pwm constraints */
-static const int PWM_MIN = 0;
+
 
 
 /* Helper: clamp float */

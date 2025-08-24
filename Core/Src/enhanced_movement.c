@@ -17,9 +17,9 @@
 #define MOVEMENT_UPDATE_PERIOD_MS       5       // 200Hz update rate
 
 // ===== HEADING PID PARAMETERS =====
-static float Kp_g = 7.0f;   // rate loop P
-static float Ki_g = 0.0f;   // rate loop I
-static float Kd_g = 0.2f;   // rate loop D
+//static float Kp_g = 7.0f;   // rate loop P
+//static float Ki_g = 0.0f;   // rate loop I
+//static float Kd_g = 0.2f;   // rate loop D
 
 
 static float Kp_yaw = 1.0f;     // Start conservative: 1.0-3.0
@@ -38,8 +38,8 @@ static const uint16_t PWM_MAX      = 1000; // PWM cap
 static VelocityProfile forward_profile = {0};
 
 // Outer loop (angle -> desired rate) simple P:
-static float Kp_angle = 4.0f;     // starts modest; increases turn crispness
-static float OMEGA_MAX = 250.0f;  // deg/s cap during turns (safe)
+//static float Kp_angle = 4.0f;     // starts modest; increases turn crispness
+//static float OMEGA_MAX = 250.0f;  // deg/s cap during turns (safe)
 
 // ===== UTILITY FUNCTIONS =====
 static inline float clampf(float v, float lo, float hi) {

@@ -14,7 +14,8 @@ void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool for
 void moveStraightPID(void);
 void moveStraightGyroPID(void);
 void moveStraightGyroPID_Reset(void);
-
+static float gyro_rate_pid_step(float setpoint_deg_s, float measurement_deg_s);
+void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms) ;
 // Enhanced encoder functions
 int32_t get_left_encoder_total(void);
 int32_t get_right_encoder_total(void);
