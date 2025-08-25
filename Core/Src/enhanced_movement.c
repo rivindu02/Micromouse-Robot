@@ -108,7 +108,7 @@ static void scurve_get_optimal_parameters(float distance, float* max_vel,
 }
 
 /**
- * @brief Enhanced S-curve forward movement with gyro stabilization
+ * @brief Enhanced S-curve forward movement with gyro stabilization  //////// Find the constants
  */
 void move_forward_scurve(float distance_mm, float speed_multiplier) {
     send_bluetooth_printf("🚀 S-curve forward: %.1f mm, speed=%.2fx\r\n",

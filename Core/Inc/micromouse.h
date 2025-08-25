@@ -40,6 +40,11 @@
 #define BATTERY_LOW_THRESHOLD 3000
 #define IR_AMBIENT_THRESHOLD 500
 
+/*To move the encoder while stopped*/
+#define PWM_MIN_MOVE_LEFT   510
+#define PWM_MIN_MOVE_RIGHT  490
+
+
 /* Audio frequencies (Hz) */
 #define TONE_STARTUP 440
 #define TONE_CONFIRMATION 523
@@ -214,9 +219,14 @@ void move_forward_adaptive_speed(float speed_multiplier);
 void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool forward, uint16_t duty);
 void test_motors_individual(void);
 void motor_set_fixed(uint8_t motor, bool forward, uint16_t duty);
-void moveStraightPID(void);
+void moveStraightPID(int base_pwm, bool left_forward, bool right_forward);
+void moveStraightPID_Reset(void);
 void moveStraightGyroPID(void);
 void moveStraightGyroPID_Reset(void);
+
+/* logging _tests */
+void run_gyro_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms, uint32_t sample_ms, uint32_t total_ms);
+void run_encoder_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms, uint32_t sample_ms, uint32_t total_ms);
 
 /* Sensor functions */
 void calibrate_sensors(void);

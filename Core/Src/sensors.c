@@ -97,24 +97,58 @@ uint16_t read_adc_channel(uint32_t channel) {
  */
 void update_sensors(void)
 {
-    // Read ambient light levels (emitters off)
-    turn_off_emitters();
-    HAL_Delay(5);
-    uint16_t ambient_front_right = read_adc_channel(ADC_CHANNEL_2);
-    uint16_t ambient_side_right = read_adc_channel(ADC_CHANNEL_3);
-    uint16_t ambient_side_left = read_adc_channel(ADC_CHANNEL_4);
-    uint16_t ambient_front_left = read_adc_channel(ADC_CHANNEL_5);
+//    // Read ambient light levels (emitters off)
+//    turn_off_emitters();
+//    HAL_Delay(5);
+//    uint16_t ambient_front_right = read_adc_channel(ADC_CHANNEL_2);
+//    uint16_t ambient_side_right = read_adc_channel(ADC_CHANNEL_3);
+//    uint16_t ambient_side_left = read_adc_channel(ADC_CHANNEL_4);
+//    uint16_t ambient_front_left = read_adc_channel(ADC_CHANNEL_5);
+//
+//    // Read with emitters on
+//    turn_on_emitters();
+//    sensors.battery = read_adc_channel(ADC_CHANNEL_0);
+//    sensors.front_right = read_adc_channel(ADC_CHANNEL_2) - ambient_front_right;
+//    sensors.side_right = read_adc_channel(ADC_CHANNEL_3) - ambient_side_right;
+//    sensors.side_left = read_adc_channel(ADC_CHANNEL_4) - ambient_side_left;
+//    sensors.front_left = read_adc_channel(ADC_CHANNEL_5) - ambient_front_left;
+//
+//    // Turn off emitters to save power
+//    turn_off_emitters();
 
-    // Read with emitters on
-    turn_on_emitters();
-    sensors.battery = read_adc_channel(ADC_CHANNEL_0);
-    sensors.front_right = read_adc_channel(ADC_CHANNEL_2) - ambient_front_right;
-    sensors.side_right = read_adc_channel(ADC_CHANNEL_3) - ambient_side_right;
-    sensors.side_left = read_adc_channel(ADC_CHANNEL_4) - ambient_side_left;
-    sensors.front_left = read_adc_channel(ADC_CHANNEL_5) - ambient_front_left;
+	const char* sensor_names[] = {"Front Left", "Front Right", "Side Left", "Side Right"};
+	uint32_t channels[] = {ADC_CHANNEL_5, ADC_CHANNEL_2, ADC_CHANNEL_4, ADC_CHANNEL_3};
+	GPIO_TypeDef* emit_ports[] = {EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_RIGHT_GPIO_Port,
+								  EMIT_SIDE_LEFT_GPIO_Port, EMIT_SIDE_RIGHT_GPIO_Port};
+	uint16_t emit_pins[] = {EMIT_FRONT_LEFT_Pin, EMIT_FRONT_RIGHT_Pin,
+						   EMIT_SIDE_LEFT_Pin, EMIT_SIDE_RIGHT_Pin};
 
-    // Turn off emitters to save power
-    turn_off_emitters();
+	int16_t difference[4];
+	for(int i = 0; i < 4; i++) {
+		// Test with emitter OFF
+		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_RESET);
+		HAL_Delay(10);
+		uint16_t off_reading = read_adc_channel(channels[i]);
+
+		// Test with emitter ON
+		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_SET);
+		HAL_Delay(10);
+		uint16_t on_reading = read_adc_channel(channels[i]);
+
+
+
+		// Calculate difference
+		difference[i] = on_reading - off_reading;
+
+		// Turn off emitter
+		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_RESET);
+		HAL_Delay(50);
+	}
+	sensors.battery = read_adc_channel(ADC_CHANNEL_0);
+	sensors.front_right = difference[1];
+	sensors.side_right = difference[3];
+	sensors.side_left = difference[2];
+	sensors.front_left = difference[0];
 
     // Process wall detection using calibrated thresholds
     if (sensor_cal.calibration_valid) {

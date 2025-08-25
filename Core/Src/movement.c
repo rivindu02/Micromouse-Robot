@@ -17,6 +17,9 @@ static uint16_t last_right_count = 32768;
 static int32_t left_total = 0;
 static int32_t right_total = 0;
 
+#define PWM_MIN_MOVE_LEFT   510
+#define PWM_MIN_MOVE_RIGHT  490
+
 /**
  * @brief Update encoder totals with proper overflow handling - NEW FUNCTION
  */
@@ -414,49 +417,154 @@ void move_forward_with_profile(float distance_mm, float max_speed) {
 }
 
 // PID parameters for encoders
-float Kp_e =0.02; // Proportional term
-float Ki_e = 0; // Integral term
-float Kd_e = 0.1; // Derivative term
-float error_e = 0;
-float previousError_e = 0;
-float integral_e = 0;
-float derivative_e = 0;
-/*
- * Encoder PID
- * */
-void moveStraightPID(void) {
-	left_total=get_left_encoder_total();
-	left_total=get_left_encoder_total();
-	error_e = left_total - right_total;
+//float Kp_e =0.02; // Proportional term
+//float Ki_e = 0; // Integral term
+//float Kd_e = 0.1; // Derivative term
+//float error_e = 0;
+//float previousError_e = 0;
+//float integral_e = 0;
+//float derivative_e = 0;
+///*
+// * Encoder PID
+// * */
+//void moveStraightPID(void) {
+//	left_total=get_left_encoder_total();
+//	left_total=get_left_encoder_total();
+//	error_e = left_total - right_total;
+//
+//	integral_e += error_e;
+//	derivative_e = error_e - previousError_e;
+//
+//	float correction = (Kp_e * error_e) + (Ki_e * integral_e) + (Kd_e * derivative_e);
+//
+//	int motor1Speed = 500 + correction;
+//	int motor2Speed = 510 - correction;
+//
+//	if (motor1Speed>1000){
+//	  motor1Speed= 1000;
+//	};
+//	if (motor2Speed>1000){
+//	  motor2Speed= 1000;
+//	};
+//	if (motor1Speed<0){
+//	  motor1Speed= 0;
+//	};
+//	if (motor2Speed<0){
+//	  motor2Speed= 0;
+//	};
+//
+//	motor_set_fixed(0, true, motor2Speed);//Left
+//
+//	motor_set_fixed(1, true, motor1Speed);//Right
+//
+//
+//	previousError_e = error_e;
+//}
 
-	integral_e += error_e;
-	derivative_e = error_e - previousError_e;
+/* Tunable gains (start conservative, tune per-bot) */
+static float Kp_e = 0.02f;   // Proportional on rate error (PWM per count/s)
+static float Ki_e = 0.0f;    // Integral on rate error
+static float Kd_e = 0.1f;    // Derivative on rate error
 
-	float correction = (Kp_e * error_e) + (Ki_e * integral_e) + (Kd_e * derivative_e);
+/* Internal state */
+static int32_t prev_left_counts = 0;
+static int32_t prev_right_counts = 0;
+static float prev_error_rate = 0.0f;
+static float integral_e = 0.0f;
+static float deriv_filt = 0.0f;
+static uint32_t pid_last_ms = 0;
 
-	int motor1Speed = 500 + correction;
-	int motor2Speed = 510 - correction;
+/* Filters / clamps */
+static const float DERIV_FILTER_ALPHA_E = 0.85f;   // 0..1, larger -> more smoothing
+static const float INTEGRAL_LIMIT_E = 1000.0f;    // clamp integral term (tune)
+static const int PWM_MIN = 0;
+static const int PWM_MAX = 700;
+static const int PWM_MIN_MOVE = 40;                // optional min to overcome stiction
 
-	if (motor1Speed>1000){
-	  motor1Speed= 1000;
-	};
-	if (motor2Speed>1000){
-	  motor2Speed= 1000;
-	};
-	if (motor1Speed<0){
-	  motor1Speed= 0;
-	};
-	if (motor2Speed<0){
-	  motor2Speed= 0;
-	};
-
-	motor_set_fixed(0, true, motor2Speed);//Left
-
-	motor_set_fixed(1, true, motor1Speed);//Right
-
-
-	previousError_e = error_e;
+/* Helper clamp */
+static inline float clampf_local(float v, float lo, float hi) {
+    return (v < lo) ? lo : (v > hi) ? hi : v;
 }
+
+/* Call once immediately before starting a straight movement */
+void moveStraightPID_Reset(void) {
+    prev_left_counts = get_left_encoder_total();
+    prev_right_counts = get_right_encoder_total();
+    prev_error_rate = 0.0f;
+    integral_e = 0.0f;
+    deriv_filt = 0.0f;
+    pid_last_ms = HAL_GetTick();
+}
+
+/*
+ * Call this repeatedly while moving forward.
+ * base_pwm: nominal forward PWM (same idea as your previous base 500).
+ * left_forward/right_forward: booleans for motor_set_fixed() direction
+ *
+ * If your robot uses fixed forward direction everywhere, pass true/true.
+ */
+void moveStraightPID(int base_pwm, bool left_forward, bool right_forward) {
+    uint32_t now = HAL_GetTick();
+    float dt = (now - pid_last_ms) / 1000.0f;
+    if (dt <= 0.0f) dt = 0.001f;   // safety
+    pid_last_ms = now;
+
+    /* Read encoder totals */
+    int32_t left_total = get_left_encoder_total();
+    int32_t right_total = get_right_encoder_total();
+
+    /* Delta counts in this interval */
+    int32_t dleft = left_total - prev_left_counts;
+    int32_t dright = right_total - prev_right_counts;
+
+    /* Save for next iteration */
+    prev_left_counts  = left_total;
+    prev_right_counts = right_total;
+
+    /* Convert to rate (counts per second). Using counts/s is robust and avoids
+       huge integrator values on long runs. If you prefer physical units, convert
+       counts -> mm using your ENCODER_COUNTS_PER_MM constant first. */
+    float left_rate  = (float)dleft / dt;   // counts / s
+    float right_rate = (float)dright / dt;  // counts / s
+
+    /* Error is rate difference: left - right (positive => left faster) */
+    float error_rate = left_rate - right_rate;
+
+    /* Integral on rate error */
+    integral_e += error_rate * dt;
+    integral_e = clampf_local(integral_e, -INTEGRAL_LIMIT_E, INTEGRAL_LIMIT_E);
+
+    /* Derivative (on error rate) with low-pass filtering */
+    float deriv_raw = (error_rate - prev_error_rate) / dt;   // d(error_rate)/dt
+    deriv_filt = DERIV_FILTER_ALPHA_E * deriv_filt + (1.0f - DERIV_FILTER_ALPHA_E) * deriv_raw;
+
+    /* PID output: signed PWM correction (positive -> speed up right wheel OR slow left wheel) */
+    float correction = (Kp_e * error_rate) + (Ki_e * integral_e) + (Kd_e * deriv_filt);
+
+    /* Map correction to motor PWMs: keep same sign mapping as your original code:
+       original: motor1 = base + correction; motor2 = base - correction
+       (motor1 = right wheel, motor2 = left wheel). */
+    int pwm_right = (int)roundf((float)base_pwm + correction);
+    int pwm_left  = (int)roundf((float)base_pwm - correction);
+
+    /* Clamp */
+    pwm_left  = (int)clampf_local((float)pwm_left, (float)PWM_MIN, (float)PWM_MAX);
+    pwm_right = (int)clampf_local((float)pwm_right, (float)PWM_MIN, (float)PWM_MAX);
+
+    /* Optional: enforce minimum non-zero movement so wheel actually turns */
+    if (pwm_left > 0 && pwm_left < PWM_MIN_MOVE) pwm_left = PWM_MIN_MOVE;
+    if (pwm_right > 0 && pwm_right < PWM_MIN_MOVE) pwm_right = PWM_MIN_MOVE;
+
+    /* Apply to motors (Left = index 0 in your mapping, Right = index 1) */
+    motor_set_fixed(0, left_forward,  (uint16_t)pwm_left);   // Left
+    motor_set_fixed(1, right_forward, (uint16_t)pwm_right);  // Right
+
+    /* remember for next loop */
+    prev_error_rate = error_rate;
+}
+
+
+
 
 // PID parameters for gyro
 float Kp_g = 6.4; // Proportional term
@@ -470,7 +578,7 @@ float Kd_g = 2; // Derivative term
 static float pid_error_prev = 0.0f;      // previous error (for derivative)
 static float pid_integral = 0.0f;        // integrated error (with dt)
 static float pid_deriv_filt = 0.0f;      // filtered derivative
-static uint32_t pid_last_ms = 0;         // last time stamp
+
 
 /* Derivative low-pass filter: alpha in [0..1], bigger => more smoothing */
 static const float DERIV_FILTER_ALPHA = 0.85f;
@@ -481,10 +589,6 @@ static const float INTEGRAL_LIMIT = 2000.0f; // tune as needed (units: deg/s * s
 
 
 
-/* Helper: clamp float */
-static inline float clampf_local(float v, float lo, float hi) {
-    return (v < lo) ? lo : (v > hi) ? hi : v;
-}
 
 /* Call this once immediately before starting a straight movement */
 void moveStraightGyroPID_Reset(void) {
