@@ -216,36 +216,72 @@ def analyze_gyro(csv_file):
     right_pwm = data[:, r_pw_idx]
     gyro_z = data[:, gyro_idx]
 
+    # detect step index
     step_idx = detect_step(left_pwm)
     if step_idx is None:
         step_idx = detect_step(right_pwm)
     if step_idx is None:
         raise RuntimeError("No PWM step detected in gyro CSV.")
     t_step = t[step_idx]
+
     pre_l = np.median(left_pwm[:max(3, step_idx)])
     pre_r = np.median(right_pwm[:max(3, step_idx)])
-    post_l = np.median(left_pwm[-max(3, len(left_pwm)//10):])
-    post_r = np.median(right_pwm[-max(3, len(left_pwm)//10):])
+    # find a local post-step plateau (avoid final-file median if PWM reverts)
+    def find_local_post_median(pwm_col, step_idx, t, window_s=0.6):
+        mean_dt = np.mean(np.diff(t)) if len(t) > 1 else 0.01
+        win_samples = max(1, int(window_s / mean_dt))
+        start = step_idx + 1
+        end = min(len(pwm_col), start + win_samples)
+        if start >= end:
+            return pwm_col[-1]
+        return float(np.median(pwm_col[start:end]))
+    post_l = find_local_post_median(left_pwm, step_idx, t, window_s=0.6)
+    post_r = find_local_post_median(right_pwm, step_idx, t, window_s=0.6)
+
     dL = post_l - pre_l
     dR = post_r - pre_r
-    delta_diff = dR - dL
+    delta_diff = (dR - dL)
 
     y0 = np.mean(gyro_z[:max(3, step_idx)])
     yinf = steady_avg(gyro_z, pct=0.15)
-    K_proc = (yinf - y0) / (delta_diff if abs(delta_diff)>1e-9 else 1e-9)
+
+    if abs(delta_diff) < 1e-9:
+        raise RuntimeError("No effective differential PWM change detected for gyro test.")
+
+    K_proc = (yinf - y0) / (delta_diff if abs(delta_diff) > 1e-12 else 1e-12)
     tau, theta = estimate_tau_theta(t, gyro_z, t_step, y0, yinf)
+
+    # Fallback if tau couldn't be estimated
     if tau is None:
-        tau = max(0.01, (t[-1]-t_step)/4)
+        # make a reasonable conservative estimate:
+        tau = max(0.01, (t[-1] - t_step) / 4.0)
+        theta = theta if theta is not None else 0.0
+        print("WARNING: could not find 63% crossing to estimate tau reliably.")
+        print(f"Using fallback tau = {tau:.3f} s (based on test duration).")
+
     Kc, Ki, Ti, lam = imc_pi(K_proc, tau, theta)
     print("=== Gyro analysis ===")
-    print(f"t_step={t_step:.3f}s post delta diff={delta_diff:.3f}")
-    print(f"y0={y0:.3f} deg/s yinf={yinf:.3f} deg/s")
-    print(f"K_proc (deg/s per PWM) = {K_proc:.6f}, tau={tau:.3f}, theta={theta:.3f}")
-    print("IMC PI for gyro (rate controller):")
-    print(f"  Kp_gyro = {Kc:.6f}  (PWM per deg/s)")
-    print(f"  Ki_gyro = {Ki:.6f}")
+    print("file:", csv_file)
+    print(f"t_step = {t_step:.3f} s")
+    print(f"pre Lpw={pre_l:.1f}, pre Rpw={pre_r:.1f} ; post Lpw={post_l:.1f}, post Rpw={post_r:.1f}")
+    print(f"delta_pwm_diff = (dR - dL) = {delta_diff:.3f}")
+    print(f"y0 (pre) = {y0:.3f} deg/s")
+    print(f"y_inf (post) = {yinf:.3f} deg/s")
+    print(f"Estimated process gain K_proc = Δ(gyro_z) / Δ(pwm_diff) = {K_proc:.6f} (deg/s) per PWM")
+    print(f"Estimated tau = {tau:.3f} s, theta = {theta:.3f} s")
+    print()
+    print("IMC PI tuning (robust):")
+    print(f"  Kp_gyro (PWM per deg/s) = {Kc:.6f}")
+    print(f"  Ki_gyro (PWM per deg/s per s) = {Ki:.6f}")
+    print(f"  Ti = {Ti:.3f} s, lambda used = {lam:.3f}")
     if HAS_PLOT:
-        plt.figure(); plt.plot(t, gyro_z); plt.axvline(t_step); plt.grid(True); plt.show()
+        plt.figure(figsize=(8,4))
+        plt.plot(t, gyro_z, label='gyro_z (deg/s)')
+        plt.axvline(t_step, color='k', linestyle='--', label='step')
+        plt.xlabel('t (s)'); plt.ylabel('deg/s'); plt.legend(); plt.grid(True)
+        plt.title('Gyro angular-rate response')
+        plt.show()
+
 
 def main():
     if len(sys.argv) > 1:

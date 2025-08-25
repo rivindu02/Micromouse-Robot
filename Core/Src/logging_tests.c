@@ -95,6 +95,7 @@ void run_gyro_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uin
             float dt = (float)sample_ms / 1000.0f;
             float left_rate = (float)(left_total - prev_left) / dt;
             float right_rate = (float)(right_total - prev_right) / dt;
+            mpu9250_read_gyro();
 
             float gyro_z = mpu9250_get_gyro_z_compensated();
 
@@ -177,4 +178,49 @@ void run_encoder_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, 
 
     stop_motors();
     log_printf("#DONE: encoder step test finished\r\n");
+}
+
+
+void run_gyro_turn_step_test(int base_pwm, int delta_pwm,
+                             uint32_t step_delay_ms, uint32_t step_duration_ms,
+                             uint32_t sample_ms, uint32_t total_ms)
+{
+    send_bluetooth_printf("t_ms,Lpwm,Rpwm,gz,left_cnt,right_cnt\r\n");
+
+    uint32_t t0 = HAL_GetTick();
+    uint32_t next_sample = t0;
+    start_encoders();
+
+    while ((HAL_GetTick() - t0) <= total_ms) {
+        uint32_t now = HAL_GetTick();
+        uint32_t t_rel = now - t0;
+
+        int lpwm = base_pwm;
+        int rpwm = base_pwm;
+
+        if (t_rel >= step_delay_ms && t_rel < (step_delay_ms + step_duration_ms)) {
+            lpwm = clampf(base_pwm - delta_pwm, 0, 1000);
+            rpwm = clampf(base_pwm + delta_pwm, 0, 1000);
+        }
+
+        mpu9250_read_gyro();
+        // in-place turn: left backward, right forward
+        motor_set_fixed(0, false, lpwm);
+        motor_set_fixed(1, true,  rpwm);
+
+        if (now >= next_sample) {
+            float gz = mpu9250_get_gyro_z_compensated();
+            int32_t lc = get_left_encoder_total();
+            int32_t rc = get_right_encoder_total();
+            send_bluetooth_printf("%lu,%d,%d,%.3f,%ld,%ld\r\n",
+                                  (unsigned long)t_rel, lpwm, rpwm, gz,
+                                  (long)lc, (long)rc);
+            next_sample += sample_ms;
+        }
+
+        HAL_Delay(1);
+    }
+
+    stop_motors();
+    send_bluetooth_printf("#DONE gyro step test\r\n");
 }

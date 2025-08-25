@@ -223,10 +223,12 @@ void moveStraightPID(int base_pwm, bool left_forward, bool right_forward);
 void moveStraightPID_Reset(void);
 void moveStraightGyroPID(void);
 void moveStraightGyroPID_Reset(void);
+void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms);
 
 /* logging _tests */
 void run_gyro_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms, uint32_t sample_ms, uint32_t total_ms);
 void run_encoder_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms, uint32_t sample_ms, uint32_t total_ms);
+void run_gyro_turn_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms,uint32_t sample_ms, uint32_t total_ms);
 
 /* Sensor functions */
 void calibrate_sensors(void);

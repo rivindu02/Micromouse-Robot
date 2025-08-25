@@ -188,7 +188,11 @@ int main(void)
 
 
   //mpu9250_send_status();
+  turn_in_place_gyro( 90.0f, 650, 2500);  // left 90°
 
+
+  // run a left-turn step test
+  //run_gyro_turn_step_test(600, 150, 1000, 2000, 10, 3000);
 
 
 
@@ -206,18 +210,18 @@ int main(void)
   send_bluetooth_printf("TEST HAL_GetTick=%lu\r\n", (unsigned long)HAL_GetTick());
   send_bluetooth_printf("LeftEnc=%ld RightEnc=%ld\r\n", (long)get_left_encoder_total(), (long)get_right_encoder_total());
 
-  run_encoder_step_test(600, 100, 1000, 2500, 10, 3000); // base=600, delta=100, start=1000ms, hold 2500ms, sample=10ms, total=3000ms
+  //run_gyro_step_test(600, 100, 1000, 2500, 10, 3000); // base=600, delta=100, start=1000ms, hold 2500ms, sample=10ms, total=3000ms
 
-  // use gyro PID/////////////////////////////////////////////////////////////
+   //use gyro PID/////////////////////////////////////////////////////////////
 //  moveStraightGyroPID_Reset();
 //  moveStraightPID_Reset();
 //  while(1){//get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
 //	  mpu9250_read_gyro();
 //
-//	  moveStraightPID(500,true,true);
+//	  moveStraightGyroPID();
 //	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
 //  }
-  break_motors();
+//  break_motors();
 
   HAL_Delay(100);
 

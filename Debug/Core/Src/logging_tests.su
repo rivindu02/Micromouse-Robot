@@ -1,4 +1,5 @@
 ../Core/Src/logging_tests.c:25:13:log_printf	272	static
 ../Core/Src/logging_tests.c:46:14:clampf	24	static
 ../Core/Src/logging_tests.c:55:6:run_gyro_step_test	136	static
-../Core/Src/logging_tests.c:122:6:run_encoder_step_test	112	static
+../Core/Src/logging_tests.c:123:6:run_encoder_step_test	112	static
+../Core/Src/logging_tests.c:184:6:run_gyro_turn_step_test	80	static

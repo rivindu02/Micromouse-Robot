@@ -462,9 +462,9 @@ void move_forward_with_profile(float distance_mm, float max_speed) {
 //}
 
 /* Tunable gains (start conservative, tune per-bot) */
-static float Kp_e = 0.02f;   // Proportional on rate error (PWM per count/s)
-static float Ki_e = 0.0f;    // Integral on rate error
-static float Kd_e = 0.1f;    // Derivative on rate error
+static float Kp_e = 0.018f;//0.02f;   // Proportional on rate error (PWM per count/s)
+static float Ki_e = 0.040f;    // Integral on rate error
+static float Kd_e = 0.000f;    // Derivative on rate error
 
 /* Internal state */
 static int32_t prev_left_counts = 0;
@@ -567,9 +567,9 @@ void moveStraightPID(int base_pwm, bool left_forward, bool right_forward) {
 
 
 // PID parameters for gyro
-float Kp_g = 6.4; // Proportional term
-float Ki_g = 0; // Integral term
-float Kd_g = 2; // Derivative term
+float Kp_g = 0.8657f;//6.4; // Proportional term
+float Ki_g = 5.3769f;//0; // Integral term
+float Kd_g = 0.0f;//2; // Derivative term
 //float error_g = 0;
 //float previousError_g = 0;
 //float integral_g = 0;
@@ -622,14 +622,14 @@ void moveStraightGyroPID(void) {
     float correction = (Kp_g * error) + (Ki_g * pid_integral) + (Kd_g * pid_deriv_filt);
 
     /* Base PWM for forward motion (adjust to your nominal cruising PWM) */
-    const int base_pwm = 500;
+    const int base_pwm = 700;
 
     int motor1Speed = (int)roundf((float)base_pwm - correction); // right wheel in your mapping
     int motor2Speed = (int)roundf((float)base_pwm + correction); // left wheel
 
     /* Clamp PWM outputs (and provide a safe top, not full 1000 if you prefer) */
-    if (motor1Speed > 700) motor1Speed = 700;
-    if (motor2Speed > 700) motor2Speed = 700;
+    if (motor1Speed > 800) motor1Speed = 800;
+    if (motor2Speed > 800) motor2Speed = 800;
     if (motor1Speed < 0) motor1Speed = 0;
     if (motor2Speed < 0) motor2Speed = 0;
 
@@ -643,139 +643,158 @@ void moveStraightGyroPID(void) {
     pid_error_prev = error;
 }
 
-/* PID internal state */
-static float pid_int = 0.0f;
-static float pid_prev_err = 0.0f;
+
+
+
+// Measured plant gain (from your CSV): ~1.3828 deg/s per ΔPWM
+#define GYRO_K_DPS_PER_DPWM   1.3828f
+
+// Rate PID gains (start conservative; move up if stable)
+float Kp_t = 0.866955;   //(PWM per deg/s)
+float Ki_t = 5.384815;   //(PWM per deg/s per s)// PWM per deg  (with integral += err*dt)
+float Kd_t =0; // PWM per (deg/s^2)
+
+// Desired-rate shaping
+static float OMEGA_MAX_DPS   = 300.0f;   // cap desired |rate|
+static float ALPHA_MAX_DPS2  = 3000.0f;  // braking accel (deg/s^2)
+
+// Finish criteria
+static float ANGLE_TOL_DEG   = 1.0f;
+static float RATE_TOL_DPS    = 20.0f;
+static uint32_t SETTLE_MS    = 60;
+
+// Small command deadband near stop (don’t twitch)
+static float OMEGA_CMD_DEADBAND = 12.0f;   // deg/s
+
+// Derivative filtering + integral clamp
+static const float DERIV_ALPHA  = 0.90f;   // 0..1
 static const float INTEGRAL_CLAMP = 1000.0f;
 
-/* Reset PID/time state before a turn */
+// --- PID state ---
+static float pid_int = 0.0f, pid_prev_err = 0.0f, pid_deriv_f = 0.0f;
+
+static inline float signf(float x) { return (x >= 0.0f) ? 1.0f : -1.0f; }
+
 static void gyro_turn_reset(void) {
     pid_int = 0.0f;
     pid_prev_err = 0.0f;
+    pid_deriv_f = 0.0f;
     pid_last_ms = HAL_GetTick();
 }
 
-/**
- * @brief Turn in-place using gyro PID
- * @param angle_deg positive = left turn, negative = right turn
- * @param base_pwm base motor magnitude (0..1000) used as feed value
- * @param timeout_ms safety timeout (ms)
- */
-void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms) {
-    // Safety / bounds
-    if (base_pwm < 50) base_pwm = 50;
-    if (base_pwm > 1000) base_pwm = 1000;
+static float gyro_rate_pid_step(float sp_dps, float meas_dps, float *p_dt) {
+    uint32_t now = HAL_GetTick();
+    float dt = (now - pid_last_ms) / 1000.0f;
+    if (dt <= 0.0f) dt = 0.002f;
+    pid_last_ms = now;
+    if (p_dt) *p_dt = dt;
 
-    // Reset integrators and time
+    float err = sp_dps - meas_dps;
+
+    // integral (anti-windup)
+    pid_int += err * dt;
+    if (pid_int >  INTEGRAL_CLAMP) pid_int =  INTEGRAL_CLAMP;
+    if (pid_int < -INTEGRAL_CLAMP) pid_int = -INTEGRAL_CLAMP;
+
+    // derivative (filtered)
+    float d_raw = (err - pid_prev_err) / dt;
+    pid_deriv_f = DERIV_ALPHA * pid_deriv_f + (1.0f - DERIV_ALPHA) * d_raw;
+    pid_prev_err = err;
+
+    // PID → ΔPWM (right - left)
+    return Kp_g*err + Ki_g*pid_int + Kd_g*pid_deriv_f;
+}
+
+/**
+ * In-place turn by angle (deg). +angle = CCW/left, -angle = CW/right.
+ * base_pwm = 80..250 is typical. timeout_ms is safety.
+ */
+void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms)
+{
+    if (base_pwm < 60)  base_pwm = 60;
+    if (base_pwm > 400) base_pwm = 400;
+
     gyro_turn_reset();
 
-    // Integrate gyro for heading
-    float yaw = 0.0f;
-    uint32_t t_start = HAL_GetTick();
+    float yaw = 0.0f;                  // integrated heading (deg)
+    const float target = angle_deg;    // signed target
+    uint32_t t0 = HAL_GetTick();
+    uint32_t settle_start = 0;
 
-    // direction
-    int dir = (angle_deg >= 0.0f) ? +1 : -1; // +1 left, -1 right
-    float target = fabsf(angle_deg);
-
-    // small tolerances
-    const float ANGLE_TOL_DEG = 1.5f;    // finishing angle tolerance
-    const float RATE_TOL_DPS  = 20.0f;   // gyro rate must be small to stop
-
-    // last time for yaw integration
+    // last timestamp for yaw integration
     uint32_t last_ms = HAL_GetTick();
 
     while (1) {
+        // --- timing ---
         uint32_t now = HAL_GetTick();
         float dt = (now - last_ms) / 1000.0f;
         if (dt <= 0.0f) dt = 0.001f;
         last_ms = now;
-
-        // read gyro (deg/s), compensated for bias
         mpu9250_read_gyro();
-        float gz = mpu9250_get_gyro_z_compensated(); // deg/s, positive sign convention as used elsewhere. :contentReference[oaicite:3]{index=3}
+        // --- sensors ---
+        float gz = mpu9250_get_gyro_z_compensated();  // deg/s
 
-        // integrate yaw (use gyro sign consistent with desired dir)
-        yaw += gz * dt; // yaw positive means left rotation if your sensor uses that convention
+        // --- integrate heading (keep sign!) ---
+        yaw += gz * dt;
 
-        float turned = fabsf(yaw);
-        float ang_err = target - turned;
+        // signed angle error (THIS FIXES THE MAIN BUG)
+        float ang_err = target - yaw;
 
-        // check completion: angle reached and rotation settled
-        if (ang_err <= ANGLE_TOL_DEG && fabsf(gz) < RATE_TOL_DPS) {
-            break;
+        // desired rate with braking law (changes sign if you overshoot)
+        float omega_brake = sqrtf(fmaxf(0.0f, 2.0f * ALPHA_MAX_DPS2 * fabsf(ang_err)));
+        float omega_des = clampf_local(omega_brake, 0.0f, OMEGA_MAX_DPS) * signf(ang_err);
+
+        // small deadband on command (avoid micro twitch)
+        if (fabsf(omega_des) < OMEGA_CMD_DEADBAND) omega_des = 0.0f;
+
+        // --- inner rate loop ---
+        float pid_dt = 0.0f;
+        float dPWM_pid = gyro_rate_pid_step(omega_des, gz, &pid_dt);  // ΔPWM from PID
+        float dPWM_ff  = (fabsf(omega_des) > 0.0f) ? (omega_des / GYRO_K_DPS_PER_DPWM) : 0.0f;
+        float dPWM     = dPWM_ff + dPWM_pid;   // total ΔPWM (right - left), signed
+
+        // split ΔPWM around base so both sides get torque
+        float right_mag = (float)base_pwm + 0.5f * fabsf(dPWM);
+        float left_mag  = (float)base_pwm + 0.5f * fabsf(dPWM);
+
+        // decide directions from CURRENT command sign (not the initial turn dir)
+        bool left_forward, right_forward;
+        if (dPWM >= 0.0f) {
+            // turn left: left backward, right forward
+            left_forward  = false;
+            right_forward = true;
+        } else {
+            // turn right: left forward, right backward
+            left_forward  = true;
+            right_forward = false;
         }
 
-        if ((HAL_GetTick() - t_start) > timeout_ms) {
-            // timeout — abort to avoid lock
-            break;
+        // if command very small AND rate small, cut power to stop cleanly
+        if (fabsf(ang_err) <= ANGLE_TOL_DEG && fabsf(gz) <= RATE_TOL_DPS) {
+            motor_set_fixed(0, true, 0);
+            motor_set_fixed(1, true, 0);
+            if (settle_start == 0) settle_start = now;
+            if ((now - settle_start) >= SETTLE_MS) break;
+        } else {
+            settle_start = 0;
+
+            // Apply PWM (no fake “min move” offsets here—let control truly go to 0 near stop)
+            int pwmL = (int)roundf(left_mag);
+            int pwmR = (int)roundf(right_mag);
+            if (pwmL < 0) pwmL = 0; if (pwmL > 1000) pwmL = 1000;
+            if (pwmR < 0) pwmR = 0; if (pwmR > 1000) pwmR = 1000;
+
+            motor_set_fixed(0, left_forward,  (uint16_t)pwmL);
+            motor_set_fixed(1, right_forward, (uint16_t)pwmR);
         }
 
-        /* Outer: convert angle error -> desired angular rate */
-        static float Kp_angle = 6.0f;  // (deg/s per deg error) — tune lower/higher
-        static float OMEGA_MAX  = 300.0f; // deg/s cap for turning speed*
+        if ((now - t0) > timeout_ms) break;
 
-        // Outer -> desired angular rate (deg/s)
-        float omega_des = clampf_local(Kp_angle * ang_err, 0.0f, OMEGA_MAX) * (float)dir;
-
-        // Inner PID -> correction (signed PWM)
-        float u = gyro_rate_pid_step(omega_des, gz);
-
-        // Map correction to left/right PWM magnitudes
-        // For an in-place turn:
-        //   left wheel direction = backward for left turns, forward for right turns
-        //   right wheel direction = forward for left turns, backward for right turns
-        int left_forward  = (dir < 0) ? 1 : 0; // left_forward = 1 means forward, 0 means reverse in motor_set_fixed() expectation
-        int right_forward = (dir > 0) ? 1 : 0;
-
-        // Compute magnitudes (apply u as differential)
-        // Increase one side and decrease other to increase rotation rate.
-        int pwm_left  = (int)roundf((float)base_pwm - u);
-        int pwm_right = (int)roundf((float)base_pwm + u);
-
-        // clamp magnitudes
-        if (pwm_left < 0) pwm_left = 0;
-        if (pwm_right < 0) pwm_right = 0;
-        if (pwm_left > 1000) pwm_left = 1000;
-        if (pwm_right > 1000) pwm_right = 1000;
-
-        // Apply minimum to overcome stiction
-        const int PWM_MIN_MOVE = 40;
-        if (pwm_left > 0 && pwm_left < PWM_MIN_MOVE) pwm_left = PWM_MIN_MOVE;
-        if (pwm_right > 0 && pwm_right < PWM_MIN_MOVE) pwm_right = PWM_MIN_MOVE;
-
-        // Set motors (note: movement.c uses motor_set_fixed; existing encoder turns do same pattern). :contentReference[oaicite:4]{index=4}
-        // Choose directions consistent with your hardware mapping:
-        // turn_left in original used: motor_set_fixed(0,false,800); motor_set_fixed(1,true,800);
-        // We set direction using left_forward/right_forward computed above.
-        motor_set_fixed(0, left_forward ? true : false, (uint16_t)pwm_left);
-        motor_set_fixed(1, right_forward ? true : false, (uint16_t)pwm_right);
-
-        // small sleep — keep update rate ~200Hz
-        HAL_Delay(3);
+        HAL_Delay(2); // ~500 Hz outer loop
     }
 
-    // stop & settle
     stop_motors();
-    HAL_Delay(80);
-}
-
-
-/* inner rate PID: setpoint = desired_deg_per_s, measurement = gyro deg/s */
-static float gyro_rate_pid_step(float setpoint_deg_s, float measurement_deg_s) {
-    uint32_t now = HAL_GetTick();
-    float dt = (now - pid_last_ms) / 1000.0f;
-    if (dt <= 0.0f) dt = 0.002f; // fallback small dt
-    pid_last_ms = now;
-
-    float err = setpoint_deg_s - measurement_deg_s;
-    pid_int += err * dt;
-    pid_int = clampf_local(pid_int, -INTEGRAL_CLAMP, INTEGRAL_CLAMP);
-
-    float deriv = (err - pid_prev_err) / dt;
-    pid_prev_err = err;
-
-    float out = (Kp_g * err) + (Ki_g * pid_int) + (Kd_g * deriv);
-    return out; // signed PWM correction
+    HAL_Delay(60);
 }
 
 
