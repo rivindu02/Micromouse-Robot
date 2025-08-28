@@ -194,12 +194,12 @@ void move_forward(void)
 
 void turn_left(void) {
     // turn 90 degrees left using gyro PID, 1200 ms timeout for safety
-    turn_in_place_gyro(+90.0f, 520, 1200);
+    turn_in_place_gyro(+90.0f, 650, 1200);
     robot.direction = (robot.direction + 3) % 4;
 }
 
 void turn_right(void) {
-    turn_in_place_gyro(-90.0f, 520, 1200);
+    turn_in_place_gyro(-90.0f, 650, 1200);
     robot.direction = (robot.direction + 1) % 4;
 }
 

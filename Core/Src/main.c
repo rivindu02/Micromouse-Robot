@@ -75,6 +75,13 @@ EncoderData encoders;
 volatile uint8_t button_pressed = 0;
 volatile uint8_t start_flag = 0;
 
+// Default fallback values
+// Global adaptive thresholds for weak signals
+uint16_t WALL_THRESHOLD_SIDE = 25;   // Very low for weak signals
+uint16_t WALL_THRESHOLD_FRONT = 60;  // Slightly higher
+
+
+
 /* Championship path analysis variables */
 int exploration_steps = 0;
 int theoretical_minimum = 0;
@@ -160,6 +167,7 @@ int main(void)
   championship_micromouse_init();
   verify_adc_gpio_configuration(); // Missed configurations for adc
   adc_system_diagnostics();	// verify adc system settings and check ADC channels individually
+  //calibrate_sensors();  // Calibration is needed////////////////////////////////////////////////
 
 
   // Check gyro initialization
@@ -188,7 +196,8 @@ int main(void)
 
 
   //mpu9250_send_status();
-  turn_in_place_gyro( 90.0f, 650, 2500);  // left 90°
+  //turn_in_place_gyro( 90.0f, 650, 2500);  // left 90°
+
 
 
   // run a left-turn step test
@@ -236,6 +245,13 @@ int main(void)
       // Don't mark as critical failure - encoders might be stationary
   }
 
+//  while(1){
+//	  update_sensors();
+//	  //diagnostic_sensor_test();
+//	  HAL_Delay(500);
+//  }
+
+
 
 
 
@@ -277,12 +293,9 @@ int main(void)
 
   // get ADC Values//////////////////////////////////////////////////////
   start_encoders();
-//  calibrate_sensors();
-//  while(1){
-//	  //update_sensors();
-//	  diagnostic_sensor_test();
-//	  HAL_Delay(500);
-//  }
+
+
+
 
   /* Execute championship exploration */
   championship_exploration_with_analysis();
@@ -323,11 +336,6 @@ int main(void)
 
 
 	  }
-
-
-
-
-
 
 	  // Send periodic status updates
 	  static uint32_t last_status = 0;

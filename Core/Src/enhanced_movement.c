@@ -244,7 +244,7 @@ void move_forward_scurve(float distance_mm, float speed_multiplier) {
  * @brief Enhanced championship move forward using S-curve + gyro
  */
 bool championship_move_forward_enhanced(void) {
-    update_sensors();
+   update_sensors();
 
     // Check for wall before moving
     if (sensors.wall_front) {
@@ -261,7 +261,20 @@ bool championship_move_forward_enhanced(void) {
     }
 
     // Use S-curve movement for one cell
-    move_forward_scurve(CELL_SIZE_MM, 1.0f);
+    //move_forward_scurve(CELL_SIZE_MM, 1.0f);////////////////////////////////////////////////////
+
+    moveStraightGyroPID_Reset();
+    moveStraightPID_Reset();
+    while(get_left_encoder_total()<=1461 || get_right_encoder_total()<=1461){
+  	  mpu9250_read_gyro();
+
+  	  moveStraightGyroPID();
+  	  //send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
+    }
+    break_motors();
+    HAL_Delay(1000);
+
+
 
     // Update position after successful movement
     robot.x = new_x;

@@ -17,9 +17,9 @@
 #include <math.h>    // For fabsf(), sqrtf()
 
 /* Maze configuration */
-#define MAZE_SIZE 16
+#define MAZE_SIZE 12 //////////////////////////////////////////////////////////////////16
 #define MAX_DISTANCE 9999
-#define CELL_SIZE_MM 180.0f
+#define CELL_SIZE_MM 192.0f
 
 /* Direction constants */
 #define NORTH 0
@@ -35,8 +35,10 @@
 #define ENCODER_COUNTS_PER_TURN 500
 
 /* Sensor thresholds */
-#define WALL_THRESHOLD_FRONT 2000
-#define WALL_THRESHOLD_SIDE 1500
+// Global adaptive thresholds set by calibration
+extern uint16_t WALL_THRESHOLD_SIDE;
+extern uint16_t WALL_THRESHOLD_FRONT;
+
 #define BATTERY_LOW_THRESHOLD 3000
 #define IR_AMBIENT_THRESHOLD 500
 

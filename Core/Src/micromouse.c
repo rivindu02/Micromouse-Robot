@@ -82,8 +82,8 @@ void initialize_championship_maze(void)
 }
 
 /**
- * @brief Championship flood fill from GOAL position (MMS algorithm)
- * This is the key difference - we flood from destination, not robot
+ * @brief Championship flood fill from GOAL position - FIXED VERSION
+ * FIXED: Larger queue, proper bounds checking, infinite loop prevention
  */
 void championship_flood_fill(void)
 {
@@ -106,10 +106,11 @@ void championship_flood_fill(void)
         maze[0][0].distance = 0;
     }
 
-    // Queue implementation for BFS flood fill
-    int queue_x[256], queue_y[256];
+    // FIXED: Much larger queue to prevent overflow
+    static int queue_x[512], queue_y[512];  // DOUBLED size
     int queue_head = 0, queue_tail = 0;
 
+    // Initialize queue with goal positions
     if (!robot.center_reached) {
         queue_x[queue_tail] = goal_x1; queue_y[queue_tail++] = goal_y1;
         queue_x[queue_tail] = goal_x2; queue_y[queue_tail++] = goal_y1;
@@ -120,9 +121,10 @@ void championship_flood_fill(void)
     }
 
     int updates = 0;
+    const int MAX_UPDATES = 500;  // SAFETY LIMIT to prevent infinite loops
 
-    // Championship flood fill algorithm
-    while (queue_head < queue_tail) {
+    // Championship flood fill algorithm with safety checks
+    while (queue_head < queue_tail && updates < MAX_UPDATES) {
         int x = queue_x[queue_head];
         int y = queue_y[queue_head++];
 
@@ -131,7 +133,7 @@ void championship_flood_fill(void)
             int nx = x + dx[dir];
             int ny = y + dy[dir];
 
-            // Check bounds and walls
+            // FIXED: Proper bounds and wall checking
             if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE &&
                 !maze[x][y].walls[dir]) {
 
@@ -140,22 +142,30 @@ void championship_flood_fill(void)
                 // Update if we found a shorter path
                 if (new_dist < maze[nx][ny].distance) {
                     maze[nx][ny].distance = new_dist;
-                    if (queue_tail < 255) {
+
+                    // FIXED: Proper queue bounds checking
+                    if (queue_tail < 510) {  // Leave some safety margin
                         queue_x[queue_tail] = nx;
                         queue_y[queue_tail++] = ny;
                     } else {
-                        send_bluetooth_message("Queue overflow!\r\n");
-                        break;
+                        send_bluetooth_message("⚠️ Queue nearly full, stopping flood fill\r\n");
+                        goto flood_complete;  // Safe exit
                     }
-                    updates++;
                 }
             }
         }
+        updates++;
+    }
+
+flood_complete:
+    if (updates >= MAX_UPDATES) {
+        send_bluetooth_message("⚠️ Flood fill stopped at safety limit\r\n");
     }
 
     // Debug output via Bluetooth
-    send_bluetooth_printf("Championship flood fill: %d updates\r\n", updates);
+    send_bluetooth_printf("✅ Championship flood fill: %d updates\r\n", updates);
 }
+
 
 /**
  * @brief Championship direction selection - NEVER gets stuck (MMS algorithm)

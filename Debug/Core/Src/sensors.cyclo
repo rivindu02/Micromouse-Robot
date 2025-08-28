@@ -7,5 +7,5 @@
 ../Core/Src/sensors.c:245:6:send_detailed_sensor_status	5
 ../Core/Src/sensors.c:288:6:adc_system_diagnostics	9
 ../Core/Src/sensors.c:332:6:diagnostic_sensor_test	2
-../Core/Src/sensors.c:379:6:calibrate_sensors	27
-../Core/Src/sensors.c:615:10:get_calibrated_threshold	5
+../Core/Src/sensors.c:387:6:calibrate_sensors	22
+../Core/Src/sensors.c:557:10:get_calibrated_threshold	5
