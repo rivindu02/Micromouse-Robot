@@ -126,12 +126,12 @@ void update_sensors(void)
 	for(int i = 0; i < 4; i++) {
 		// Test with emitter OFF
 		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_RESET);
-		HAL_Delay(10);
+		HAL_Delay(2);	//10
 		uint16_t off_reading = read_adc_channel(channels[i]);
 
 		// Test with emitter ON
 		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_SET);
-		HAL_Delay(10);
+		HAL_Delay(2);	//10
 		uint16_t on_reading = read_adc_channel(channels[i]);
 
 
@@ -141,7 +141,7 @@ void update_sensors(void)
 
 		// Turn off emitter
 		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_RESET);
-		HAL_Delay(50);
+		HAL_Delay(3);	//50
 	}
 	sensors.battery = read_adc_channel(ADC_CHANNEL_0);
 	sensors.front_right = difference[1];
@@ -166,7 +166,6 @@ void update_sensors(void)
 
     // Enhanced sensor health monitoring using calibration data
     static uint8_t sensor_error_count = 0;
-    static bool sensors_healthy = true;
 
     if (sensor_cal.calibration_valid) {
         // Check if readings are within expected ranges based on calibration
@@ -179,9 +178,7 @@ void update_sensors(void)
 
         if (!current_reading_valid) {
             sensor_error_count++;
-            if (sensor_error_count > 5) {
-                sensors_healthy = false;
-            }
+
         } else {
             if (sensor_error_count > 0) sensor_error_count--; // Recover slowly
         }
@@ -223,6 +220,17 @@ void update_walls(void)
             maze[nx][ny].walls[(right_dir + 2) % 4] = true;
         }
     }
+    // Simple debug feedback
+    if (sensors.wall_front || sensors.wall_left || sensors.wall_right) {
+        send_bluetooth_printf("Walls: F:%s L:%s R:%s [FL:%d FR:%d SL:%d SR:%d]\r\n",
+            sensors.wall_front ? "Y" : "N",
+            sensors.wall_left ? "Y" : "N",
+            sensors.wall_right ? "Y" : "N",
+            sensors.front_left, sensors.front_right,
+            sensors.side_left, sensors.side_right);
+        play_wall_beep();
+    }
+
 
     // Mark current cell as visited
     maze[robot.x][robot.y].visited = true;

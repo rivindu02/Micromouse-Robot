@@ -123,14 +123,16 @@ void stop_motors(void)
 }
 void break_motors(void)
 {
-    // Stop all PWM channels
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 1);  // Left motor PWM = 0
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 1);  // Left motor direction = 0
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 1);  // Right motor PWM = 0
-    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, 1);  // Right motor direction = 0
-    HAL_Delay(500);
-    stop_motors();
+    // Apply active braking by setting both inputs HIGH for each motor
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 1000);  // Left IN1 = HIGH
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 1000);  // Left IN2 = HIGH
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 1000);  // Right IN3 = HIGH
+    __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, 1000);  // Right IN4 = HIGH
+
+    HAL_Delay(200);  // Hold brake briefly
+    stop_motors();   // Then coast
 }
+
 
 /**
  * @brief Move forward a specific distance - FIXED VERSION
@@ -162,7 +164,7 @@ void move_forward_distance(int target_counts) {		// CHECK///////////////////////
         HAL_Delay(1);
     }
 
-    stop_motors();		// use a S-curve to apply break/////////////////////
+    break_motors();		// use a S-curve to apply break/////////////////////
 }
 
 
@@ -196,6 +198,31 @@ void motor_set(uint8_t motor, bool forward, uint16_t duty) {
         }
     }
 }
+/////////////////////////////////////////////// Check this NEW one abnd use
+
+//void motor_set(uint8_t motor, bool forward, uint16_t duty) {
+//    if (duty > 1000) duty = 1000;
+//
+//    if (motor == 0) { // Left: TIM3 CH1=IN1 (PA6), CH2=IN2 (PA7)
+//        if (forward) {
+//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
+//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, duty);
+//        } else {
+//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty);
+//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
+//        }
+//    } else {          // Right: TIM3 CH3=IN3 (PB0), CH4=IN4 (PB1)
+//        bool f = !forward; // your wiring inversion
+//        if (f) {
+//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0);
+//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, duty);
+//        } else {
+//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, duty);
+//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, 0);
+//        }
+//    }
+//}
+
 
 // Add this function to test motors individually
 void test_motors_individual(void) {
@@ -799,7 +826,7 @@ void move_forward_distance_fusion(int target_counts, WallFollowMode_t wall_mode)
         HAL_Delay(2); // 500Hz control loop
     }
 
-    stop_motors();
+    break_motors();
     HAL_Delay(50); // Brief settling time
 }
 

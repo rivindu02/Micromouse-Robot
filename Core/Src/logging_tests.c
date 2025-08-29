@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <string.h>
+#include <math.h>
 
 /* small wrapper to keep printf usage consistent */
 static void log_printf(const char *fmt, ...) {
@@ -223,4 +224,216 @@ void run_gyro_turn_step_test(int base_pwm, int delta_pwm,
 
     stop_motors();
     send_bluetooth_printf("#DONE gyro step test\r\n");
+}
+
+
+
+
+
+/* extern your gyro PID gains if they live elsewhere */
+extern float Kp_g, Ki_g, Kd_g;
+
+/* sign helper */
+static inline float sgnf(float x) { return (x >= 0.0f) ? 1.0f : -1.0f; }
+
+/* Compute normalized wall error from sensors + mode.
+   BOTH  : e = (R - L) / (R + L)
+   LEFT  : e = (target - L) / target
+   RIGHT : e = (R - target) / target
+   Returns whether a wall reference is valid (so you know if wall controller is active). */
+static bool wall_error_normalized(WallFollowMode_t mode, float target_adc, float *e_out) {
+    float L = (float)sensors.side_left;
+    float R = (float)sensors.side_right;
+
+    switch (mode) {
+    case WALL_FOLLOW_BOTH:
+        if (sensors.wall_left && sensors.wall_right) {
+            float denom = fmaxf(L + R, 1e-3f);
+            *e_out = (R - L) / denom;
+            return true;
+        }
+        return false;
+
+    case WALL_FOLLOW_LEFT:
+        if (sensors.wall_left) {
+            float tgt = (target_adc > 1.0f) ? target_adc : fmaxf(L, 1.0f);
+            *e_out = (tgt - L) / tgt;
+            return true;
+        }
+        return false;
+
+    case WALL_FOLLOW_RIGHT:
+        if (sensors.wall_right) {
+            float tgt = (target_adc > 1.0f) ? target_adc : fmaxf(R, 1.0f);
+            *e_out = (R - tgt) / tgt;
+            return true;
+        }
+        return false;
+
+    default:
+        *e_out = 0.0f;
+        return false;
+    }
+}
+
+/* Main logger:
+   - base_pwm: forward drive (e.g., 600–700)
+   - wall_mode: BOTH/LEFT/RIGHT
+   - Kp/Ki/Kd: wall PID gains
+   - deriv_alpha: 0..1 (e.g., 0.75..0.9)
+   - blend_ratio: 0..1  (1=gyro only, 0=wall only)
+   - sample_ms: log/control interval (e.g., 10)
+   - total_ms: duration
+   - relay_h: set >0 to use relay test (wall control u = +/- relay_h) instead of PID
+   - single_wall_target: ADC target for LEFT/RIGHT (0 = auto from first reading)
+*/
+void run_wall_follow_pid_test(int base_pwm,
+                              WallFollowMode_t wall_mode,
+                              float Kp_wall, float Ki_wall, float Kd_wall,
+                              float deriv_alpha, float blend_ratio,
+                              uint32_t sample_ms, uint32_t total_ms,
+                              int relay_h, float single_wall_target)
+{
+    if (sample_ms == 0) sample_ms = 10;
+
+    /* State */
+    float wall_err_prev = 0.0f;
+    float wall_int = 0.0f;
+    float wall_deriv_f = 0.0f;
+
+    float gyro_int = 0.0f;
+    float gyro_prev_err = 0.0f;
+
+    /* For single-wall target auto-capture */
+    float target_adc = single_wall_target;
+
+    /* CSV header (matches tuner script) */
+    log_printf("t_ms,side_left,side_right,wall_error,gyro_z,gyro_correction,wall_correction,total_correction,motor_left,motor_right,mode,relay_h\r\n");
+
+    /* Start */
+    reset_encoder_totals();
+    uint32_t t0 = HAL_GetTick();
+    uint32_t last = t0;
+    uint32_t next = t0;
+
+    int ml = base_pwm, mr = base_pwm;
+    motor_set(0, true, (uint16_t)ml);
+    motor_set(1, true, (uint16_t)mr);
+
+    while ((HAL_GetTick() - t0) <= total_ms) {
+        uint32_t now = HAL_GetTick();
+        if (now < next) { HAL_Delay(1); continue; }
+
+        float dt = (now - last) / 1000.0f;
+        if (dt <= 0.0f) dt = sample_ms / 1000.0f;
+        last = now;
+        next += sample_ms;
+
+        /* Update sensors and gyro */
+        update_sensors();
+        mpu9250_read_gyro();
+        float gz = mpu9250_get_gyro_z_compensated();
+
+        /* Wall error (normalized), with lazy target capture for single-wall */
+        float e_norm = 0.0f;
+        bool wall_active = wall_error_normalized(wall_mode, target_adc, &e_norm);
+
+        if ((wall_mode == WALL_FOLLOW_LEFT) && wall_active && target_adc <= 1.0f)
+            target_adc = (float)sensors.side_left;
+        if ((wall_mode == WALL_FOLLOW_RIGHT) && wall_active && target_adc <= 1.0f)
+            target_adc = (float)sensors.side_right;
+
+        /* --- Gyro straight PID (rate-based) --- */
+        float gyro_err = gz;  /* zero desired yaw rate while going straight */
+        gyro_int += gyro_err * dt;
+        gyro_int = fmaxf(-2000.0f, fminf(2000.0f, gyro_int));
+        float gyro_der = (gyro_err - gyro_prev_err) / dt;
+        float gyro_u = (Kp_g * gyro_err) + (Ki_g * gyro_int) + (Kd_g * gyro_der);
+        gyro_prev_err = gyro_err;
+
+        /* --- Wall control (PID or relay) --- */
+        float wall_u = 0.0f;
+        if (wall_active) {
+            if (relay_h > 0) {
+                wall_u = (float)relay_h * sgnf(e_norm);
+            } else {
+                float wall_der = (e_norm - wall_err_prev) / dt;
+                wall_deriv_f = deriv_alpha * wall_deriv_f + (1.0f - deriv_alpha) * wall_der;
+
+                /* tentative wall_u to test saturation */
+                float tentative = (Kp_wall * e_norm) + (Ki_wall * wall_int) + (Kd_wall * wall_deriv_f);
+
+                /* Saturation-aware integration (anti-windup) */
+                bool will_sat = false;
+                {
+                    int ml_t = base_pwm + (int)lroundf( (blend_ratio * gyro_u) + ((1.0f - blend_ratio) * tentative) );
+                    int mr_t = base_pwm - (int)lroundf( (blend_ratio * gyro_u) + ((1.0f - blend_ratio) * tentative) );
+                    if (ml_t < 0 || ml_t > 1000 || mr_t < 0 || mr_t > 1000) will_sat = true;
+                }
+                if (!will_sat) {
+                    wall_int += e_norm * dt;
+                    /* clip integral in a normalized range;  build Ki around this */
+                    wall_int = fmaxf(-1.5f, fminf(1.5f, wall_int));
+                }
+
+                wall_u = (Kp_wall * e_norm) + (Ki_wall * wall_int) + (Kd_wall * wall_deriv_f);
+                wall_err_prev = e_norm;
+            }
+        }
+
+        /* --- Blend fusion --- */
+        float total_u = wall_active ? (blend_ratio * gyro_u + (1.0f - blend_ratio) * wall_u)
+                                    : gyro_u;
+
+        /* Motor mix and clamp */
+        ml = base_pwm + (int)lroundf(total_u);
+        mr = base_pwm - (int)lroundf(total_u);
+        ml = (int)clampf((float)ml, 0.0f, 1000.0f);
+        mr = (int)clampf((float)mr, 0.0f, 1000.0f);
+
+        motor_set(0, true, (uint16_t)ml);
+        motor_set(1, true, (uint16_t)mr);
+
+        /* Log line (matches the Python tuner) */
+        log_printf("%lu,%u,%u,%.5f,%.3f,%.3f,%.3f,%.3f,%d,%d,%d,%d\r\n",
+                   (unsigned long)(now - t0),
+                   (unsigned int)sensors.side_left,
+                   (unsigned int)sensors.side_right,
+                   e_norm,           /* wall_error (normalized) */
+                   gz,               /* gyro_z */
+                   gyro_u,           /* gyro_correction */
+                   wall_u,           /* wall_correction (PID or relay) */
+                   total_u,          /* total_correction */
+                   ml, mr,
+                   (int)wall_mode,
+                   relay_h);
+    }
+
+    stop_motors();
+    log_printf("#DONE: wall-follow pid test finished\r\n");
+}
+
+/* Convenience wrappers with sane defaults
+   - BOTH walls, safe-ish tuning start
+   - LEFT/RIGHT single-wall (reduced gains), auto target capture */
+void run_wall_follow_pid_test_both_default(int base_pwm, uint32_t sample_ms, uint32_t total_ms) {
+    run_wall_follow_pid_test(base_pwm, WALL_FOLLOW_BOTH,
+                             /*Kp*/0.18f, /*Ki*/0.00f, /*Kd*/0.025f,
+                             /*deriv_alpha*/0.80f, /*blend*/0.70f,
+                             sample_ms, total_ms,
+                             /*relay_h*/0, /*target_adc*/0.0f);
+}
+void run_wall_follow_pid_test_left_default(int base_pwm, uint32_t sample_ms, uint32_t total_ms) {
+    run_wall_follow_pid_test(base_pwm, WALL_FOLLOW_LEFT,
+                             /*Kp*/0.09f, /*Ki*/0.00f, /*Kd*/0.012f,
+                             0.80f, 0.70f,
+                             sample_ms, total_ms,
+                             0, 0.0f);
+}
+void run_wall_follow_pid_test_right_default(int base_pwm, uint32_t sample_ms, uint32_t total_ms) {
+    run_wall_follow_pid_test(base_pwm, WALL_FOLLOW_RIGHT,
+                             /*Kp*/0.09f, /*Ki*/0.00f, /*Kd*/0.012f,
+                             0.80f, 0.70f,
+                             sample_ms, total_ms,
+                             0, 0.0f);
 }

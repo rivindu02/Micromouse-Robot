@@ -108,7 +108,6 @@ static void MX_TIM3_Init(void);
 
 static void initialize_hardware_systems(void);
 static void run_system_diagnostics(void);
-static void handle_button_events(void);
 static void send_periodic_status(void);
 
 /* USER CODE END PFP */
@@ -281,7 +280,7 @@ int main(void)
   initialize_hardware_systems();
 
   // Run system diagnostics
-  //run_system_diagnostics();
+  run_system_diagnostics();
 
   // Play startup sequence
   play_startup_tone();
@@ -296,6 +295,11 @@ int main(void)
     // Initial status
   last_status_time = HAL_GetTick();
   last_blink_time = HAL_GetTick();
+
+//  while (!start_flag) {
+//      HAL_Delay(10);
+//      HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin); // Blink indicator
+//  }
 
 
     // run a left-turn step test
@@ -384,6 +388,7 @@ int main(void)
 
 	// Send periodic status updates
 	send_periodic_status();
+
 	// If exploration is running, let it continue
 	if (exploration_started && !is_exploration_complete()) {
 		// The exploration runs in run_maze_exploration_sequence()

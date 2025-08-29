@@ -1,5 +1,11 @@
-../Core/Src/logging_tests.c:25:13:log_printf	272	static
-../Core/Src/logging_tests.c:46:14:clampf	24	static
-../Core/Src/logging_tests.c:55:6:run_gyro_step_test	136	static
-../Core/Src/logging_tests.c:123:6:run_encoder_step_test	112	static
-../Core/Src/logging_tests.c:184:6:run_gyro_turn_step_test	80	static
+../Core/Src/logging_tests.c:26:13:log_printf	272	static
+../Core/Src/logging_tests.c:47:14:clampf	24	static
+../Core/Src/logging_tests.c:56:6:run_gyro_step_test	136	static
+../Core/Src/logging_tests.c:124:6:run_encoder_step_test	112	static
+../Core/Src/logging_tests.c:185:6:run_gyro_turn_step_test	80	static
+../Core/Src/logging_tests.c:237:21:sgnf	16	static
+../Core/Src/logging_tests.c:244:13:wall_error_normalized	48	static
+../Core/Src/logging_tests.c:290:6:run_wall_follow_pid_test	264	static
+../Core/Src/logging_tests.c:419:6:run_wall_follow_pid_test_both_default	32	static
+../Core/Src/logging_tests.c:426:6:run_wall_follow_pid_test_left_default	32	static
+../Core/Src/logging_tests.c:433:6:run_wall_follow_pid_test_right_default	32	static
