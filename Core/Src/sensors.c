@@ -116,7 +116,6 @@ void update_sensors(void)
 //    // Turn off emitters to save power
 //    turn_off_emitters();
 
-	const char* sensor_names[] = {"Front Left", "Front Right", "Side Left", "Side Right"};
 	uint32_t channels[] = {ADC_CHANNEL_5, ADC_CHANNEL_2, ADC_CHANNEL_4, ADC_CHANNEL_3};
 	GPIO_TypeDef* emit_ports[] = {EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_RIGHT_GPIO_Port,
 								  EMIT_SIDE_LEFT_GPIO_Port, EMIT_SIDE_RIGHT_GPIO_Port};

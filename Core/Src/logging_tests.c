@@ -59,8 +59,8 @@ void run_gyro_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uin
     reset_encoder_totals();
     int left_pwm = base_pwm;
     int right_pwm = base_pwm;
-    motor_set_fixed(0, true, (uint16_t)left_pwm);
-    motor_set_fixed(1, true, (uint16_t)right_pwm);
+    motor_set(0, true, (uint16_t)left_pwm);
+    motor_set(1, true, (uint16_t)right_pwm);
 
     /* CSV header */
     log_printf("t_ms,left_pwm,right_pwm,gyro_z,left_counts,right_counts,left_rate,right_rate\r\n");
@@ -79,13 +79,13 @@ void run_gyro_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uin
         if (t_rel >= step_delay_ms && t_rel < (step_delay_ms + step_duration_ms)) {
             left_pwm  = (int)clampf((float)base_pwm - (float)delta_pwm, 0.0f, 1000.0f);
             right_pwm = (int)clampf((float)base_pwm + (float)delta_pwm, 0.0f, 1000.0f);
-            motor_set_fixed(0, true, (uint16_t)left_pwm);
-            motor_set_fixed(1, true, (uint16_t)right_pwm);
+            motor_set(0, true, (uint16_t)left_pwm);
+            motor_set(1, true, (uint16_t)right_pwm);
         } else {
             left_pwm  = base_pwm;
             right_pwm = base_pwm;
-            motor_set_fixed(0, true, (uint16_t)left_pwm);
-            motor_set_fixed(1, true, (uint16_t)right_pwm);
+            motor_set(0, true, (uint16_t)left_pwm);
+            motor_set(1, true, (uint16_t)right_pwm);
         }
 
         if (now >= next_sample) {
@@ -127,8 +127,8 @@ void run_encoder_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, 
     reset_encoder_totals();
     int left_pwm = base_pwm;
     int right_pwm = base_pwm;
-    motor_set_fixed(0, true, (uint16_t)left_pwm);
-    motor_set_fixed(1, true, (uint16_t)right_pwm);
+    motor_set(0, true, (uint16_t)left_pwm);
+    motor_set(1, true, (uint16_t)right_pwm);
 
     log_printf("t_ms,left_pwm,right_pwm,left_counts,right_counts,left_rate,right_rate\r\n");
 
@@ -146,13 +146,13 @@ void run_encoder_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, 
         if (t_rel >= step_delay_ms && t_rel < (step_delay_ms + step_duration_ms)) {
             left_pwm  = (int)clampf((float)base_pwm - (float)delta_pwm, 0.0f, 1000.0f);
             right_pwm = (int)clampf((float)base_pwm + (float)delta_pwm, 0.0f, 1000.0f);
-            motor_set_fixed(0, true, (uint16_t)left_pwm);
-            motor_set_fixed(1, true, (uint16_t)right_pwm);
+            motor_set(0, true, (uint16_t)left_pwm);
+            motor_set(1, true, (uint16_t)right_pwm);
         } else {
             left_pwm  = base_pwm;
             right_pwm = base_pwm;
-            motor_set_fixed(0, true, (uint16_t)left_pwm);
-            motor_set_fixed(1, true, (uint16_t)right_pwm);
+            motor_set(0, true, (uint16_t)left_pwm);
+            motor_set(1, true, (uint16_t)right_pwm);
         }
 
         if (now >= next_sample) {
@@ -205,8 +205,8 @@ void run_gyro_turn_step_test(int base_pwm, int delta_pwm,
 
         mpu9250_read_gyro();
         // in-place turn: left backward, right forward
-        motor_set_fixed(0, false, lpwm);
-        motor_set_fixed(1, true,  rpwm);
+        motor_set(0, false, lpwm);
+        motor_set(1, true,  rpwm);
 
         if (now >= next_sample) {
             float gz = mpu9250_get_gyro_z_compensated();

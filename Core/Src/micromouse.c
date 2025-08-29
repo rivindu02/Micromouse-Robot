@@ -1,8 +1,15 @@
 /*
- * micromouse.c - Championship Micromouse Implementation
+ * micromouse.c - Maze Exploration and Solving Implementation
  *
- * Implements championship-level flood fill algorithm and navigation
- * Based on international competition winning strategies
+ * Based on the simulation logic from Main.c, this file implements the complete
+ * maze exploration algorithm using flood fill for the embedded micromouse.
+ *
+ * Features:
+ * - Variable maze size support
+ * - Flood fill algorithm for optimal path finding
+ * - Center-reached and return-to-start logic
+ * - Integration with moveStraightGyroPID for movement
+ * - Real-time telemetry and debugging
  */
 
 #include "micromouse.h"
@@ -10,20 +17,77 @@
 #include <string.h>
 #include <math.h>
 
-/* Championship path analysis variables */
-extern int exploration_steps;
-extern int theoretical_minimum;
 
+/* Maze exploration state variables */
+static int maze_center_x1, maze_center_y1, maze_center_x2, maze_center_y2;
+static int exploration_completed = 0;
+static int optimal_path_calculated = 0;
 
+/* BFS Queue Implementation for Flood Fill */
+#define QUEUE_MAX_SIZE (MAZE_SIZE * MAZE_SIZE + 16)
+typedef struct {
+    int x, y;
+} Position;
 
+typedef struct {
+    Position queue[QUEUE_MAX_SIZE];
+    int head, tail;
+} BFSQueue;
+
+static BFSQueue bfs_queue;
+
+/* Queue Operations */
+static void queue_init(BFSQueue* q) {
+    q->head = q->tail = 0;
+}
+
+static int queue_empty(BFSQueue* q) {
+    return q->head == q->tail;
+}
+
+static void queue_push(BFSQueue* q, Position pos) {
+    if (q->tail < QUEUE_MAX_SIZE) {
+        q->queue[q->tail++] = pos;
+    }
+}
+
+static Position queue_pop(BFSQueue* q) {
+    return q->queue[q->head++];
+}
 
 /**
- * @brief Initialize championship micromouse system with MMS integration
+ * @brief Initialize maze for exploration
  */
-void championship_micromouse_init(void)
-{
-    // Initialize championship maze
-    initialize_championship_maze();
+void initialize_maze_exploration(void) {
+    send_bluetooth_message("\r\n=== INITIALIZING MAZE EXPLORATION ===\r\n");
+
+    // Initialize maze structure
+    for (int x = 0; x < MAZE_SIZE; x++) {
+        for (int y = 0; y < MAZE_SIZE; y++) {
+            maze[x][y].distance = MAX_DISTANCE;
+            maze[x][y].visited = false;
+            maze[x][y].visit_count = 0;
+
+            // Initialize all walls as unknown (false)
+            for (int dir = 0; dir < 4; dir++) {
+                maze[x][y].walls[dir] = false;
+            }
+        }
+    }
+
+    // Set boundary walls
+    for (int i = 0; i < MAZE_SIZE; i++) {
+        maze[i][0].walls[SOUTH] = true;                    // Bottom boundary
+        maze[i][MAZE_SIZE-1].walls[NORTH] = true;          // Top boundary
+        maze[0][i].walls[WEST] = true;                     // Left boundary
+        maze[MAZE_SIZE-1][i].walls[EAST] = true;           // Right boundary
+    }
+
+    // Set maze center coordinates
+    maze_center_x1 = MAZE_SIZE / 2 - 1;
+    maze_center_y1 = MAZE_SIZE / 2 - 1;
+    maze_center_x2 = MAZE_SIZE / 2;
+    maze_center_y2 = MAZE_SIZE / 2;
 
     // Initialize robot state
     robot.x = 0;
@@ -33,188 +97,143 @@ void championship_micromouse_init(void)
     robot.returned_to_start = false;
     robot.exploration_steps = 0;
 
-    // Initialize sensors
-    memset(&sensors, 0, sizeof(sensors));
-    memset(&gyro, 0, sizeof(gyro));
-    memset(&encoders, 0, sizeof(encoders));
-
-    // Initialize championship path analysis
-    exploration_steps = 0;
-    theoretical_minimum = 0;
-
-    // Initialize gyroscope
-    mpu9250_init();
-
-    send_bluetooth_message("Championship micromouse system initialized\r\n");
-    send_bluetooth_message("Based on MMS championship algorithms\r\n");
-}
-
-/**
- * @brief Initialize maze with championship settings (MMS style)
- */
-void initialize_championship_maze(void)
-{
-    // Initialize all cells
-    for (int x = 0; x < MAZE_SIZE; x++) {
-        for (int y = 0; y < MAZE_SIZE; y++) {
-            maze[x][y].distance = MAX_DISTANCE;
-            maze[x][y].visited = false;
-            maze[x][y].visit_count = 0;
-            for (int i = 0; i < 4; i++) {
-                maze[x][y].walls[i] = false;
-            }
-        }
-    }
-
-    // Set boundary walls
-    for (int i = 0; i < MAZE_SIZE; i++) {
-        maze[i][0].walls[SOUTH] = true;           // South boundary
-        maze[i][MAZE_SIZE-1].walls[NORTH] = true; // North boundary
-        maze[0][i].walls[WEST] = true;            // West boundary
-        maze[MAZE_SIZE-1][i].walls[EAST] = true;  // East boundary
-    }
-
-    // Mark start position as visited
+    // Mark starting position
     maze[0][0].visited = true;
     maze[0][0].visit_count = 1;
 
-    send_bluetooth_message("Championship maze initialized with boundary walls\r\n");
+    // Reset exploration flags
+    exploration_completed = 0;
+    optimal_path_calculated = 0;
+
+    send_bluetooth_printf("Maze Size: %dx%d\r\n", MAZE_SIZE, MAZE_SIZE);
+    send_bluetooth_printf("Center: (%d,%d) to (%d,%d)\r\n",
+                         maze_center_x1, maze_center_y1, maze_center_x2, maze_center_y2);
+    send_bluetooth_message("Maze exploration initialized successfully!\r\n");
+    send_bluetooth_message("==========================================\r\n");
 }
 
 /**
- * @brief Championship flood fill from GOAL position (MMS algorithm)
- * This is the key difference - we flood from destination, not robot
+ * @brief Flood fill algorithm implementation
  */
-void championship_flood_fill(void)
-{
-    // Reset all distances
+void flood_fill_algorithm(void) {
+    // Initialize all distances to MAX_DISTANCE
     for (int x = 0; x < MAZE_SIZE; x++) {
         for (int y = 0; y < MAZE_SIZE; y++) {
             maze[x][y].distance = MAX_DISTANCE;
         }
     }
 
-    // Set goal distances to 0
+    // Initialize queue
+    queue_init(&bfs_queue);
+
+    // Set goal distances and add to queue
     if (!robot.center_reached) {
-        // Exploring to center - flood from center
-        maze[goal_x1][goal_y1].distance = 0;
-        maze[goal_x2][goal_y1].distance = 0;
-        maze[goal_x1][goal_y2].distance = 0;
-        maze[goal_x2][goal_y2].distance = 0;
+        // Heading to center
+        maze[maze_center_x1][maze_center_y1].distance = 0;
+        maze[maze_center_x2][maze_center_y1].distance = 0;
+        maze[maze_center_x1][maze_center_y2].distance = 0;
+        maze[maze_center_x2][maze_center_y2].distance = 0;
+
+        queue_push(&bfs_queue, (Position){maze_center_x1, maze_center_y1});
+        queue_push(&bfs_queue, (Position){maze_center_x2, maze_center_y1});
+        queue_push(&bfs_queue, (Position){maze_center_x1, maze_center_y2});
+        queue_push(&bfs_queue, (Position){maze_center_x2, maze_center_y2});
     } else {
-        // Returning to start - flood from start
+        // Returning to start
         maze[0][0].distance = 0;
+        queue_push(&bfs_queue, (Position){0, 0});
     }
 
-    // Queue implementation for BFS flood fill
-    int queue_x[256], queue_y[256];
-    int queue_head = 0, queue_tail = 0;
-
-    if (!robot.center_reached) {
-        queue_x[queue_tail] = goal_x1; queue_y[queue_tail++] = goal_y1;
-        queue_x[queue_tail] = goal_x2; queue_y[queue_tail++] = goal_y1;
-        queue_x[queue_tail] = goal_x1; queue_y[queue_tail++] = goal_y2;
-        queue_x[queue_tail] = goal_x2; queue_y[queue_tail++] = goal_y2;
-    } else {
-        queue_x[queue_tail] = 0; queue_y[queue_tail++] = 0;
-    }
-
+    // Flood fill propagation
     int updates = 0;
-
-    // Championship flood fill algorithm
-    while (queue_head < queue_tail) {
-        int x = queue_x[queue_head];
-        int y = queue_y[queue_head++];
+    while (!queue_empty(&bfs_queue)) {
+        Position current = queue_pop(&bfs_queue);
+        int x = current.x;
+        int y = current.y;
 
         // Check all four directions
         for (int dir = 0; dir < 4; dir++) {
+            if (maze[x][y].walls[dir]) continue; // Wall blocks this direction
+
             int nx = x + dx[dir];
             int ny = y + dy[dir];
 
-            // Check bounds and walls
-            if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE &&
-                !maze[x][y].walls[dir]) {
+            // Check bounds
+            if (nx < 0 || nx >= MAZE_SIZE || ny < 0 || ny >= MAZE_SIZE) continue;
 
-                int new_dist = maze[x][y].distance + 1;
-
-                // Update if we found a shorter path
-                if (new_dist < maze[nx][ny].distance) {
-                    maze[nx][ny].distance = new_dist;
-                    if (queue_tail < 255) {
-                        queue_x[queue_tail] = nx;
-                        queue_y[queue_tail++] = ny;
-                    } else {
-                        send_bluetooth_message("Queue overflow!\r\n");
-                        break;
-                    }
-                    updates++;
-                }
+            int new_distance = maze[x][y].distance + 1;
+            if (new_distance < maze[nx][ny].distance) {
+                maze[nx][ny].distance = new_distance;
+                queue_push(&bfs_queue, (Position){nx, ny});
+                updates++;
             }
         }
     }
 
-    // Debug output via Bluetooth
-    send_bluetooth_printf("Championship flood fill: %d updates\r\n", updates);
+    send_bluetooth_printf("Flood fill complete: %d updates\r\n", updates);
 }
 
 /**
- * @brief Championship direction selection - NEVER gets stuck (MMS algorithm)
+ * @brief Get best direction to move based on flood fill values
  */
-int get_championship_direction(void)
-{
-    int best_dir = robot.direction; // Default to current direction
+int get_best_direction(void) {
+    int best_dir = robot.direction;
     int min_distance = MAX_DISTANCE;
     int min_visits = 999;
     bool found_unvisited = false;
 
-    // Priority order: straight, right, left, back
-    int priority_dirs[4];
-    priority_dirs[0] = robot.direction;
-    priority_dirs[1] = (robot.direction + 1) % 4;
-    priority_dirs[2] = (robot.direction + 3) % 4;
-    priority_dirs[3] = (robot.direction + 2) % 4;
+    // Direction priority: forward, right, left, backward
+    int priority[4];
+    priority[0] = robot.direction;                    // Forward
+    priority[1] = (robot.direction + 1) % 4;         // Right
+    priority[2] = (robot.direction + 3) % 4;         // Left
+    priority[3] = (robot.direction + 2) % 4;         // Backward
 
-    // First pass: look for unvisited cells
+    // First pass: prioritize unvisited cells
     for (int p = 0; p < 4; p++) {
-        int dir = priority_dirs[p];
+        int dir = priority[p];
+
+        // Check if there's a wall in this direction
+        if (maze[robot.x][robot.y].walls[dir]) continue;
+
         int nx = robot.x + dx[dir];
         int ny = robot.y + dy[dir];
 
-        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE &&
-            !maze[robot.x][robot.y].walls[dir]) {
+        // Check bounds
+        if (nx < 0 || nx >= MAZE_SIZE || ny < 0 || ny >= MAZE_SIZE) continue;
 
-            // Prefer unvisited cells
-            if (maze[nx][ny].visit_count == 0) {
-                found_unvisited = true;
-                if (maze[nx][ny].distance < min_distance) {
-                    min_distance = maze[nx][ny].distance;
-                    best_dir = dir;
-                }
+        // Prioritize unvisited cells
+        if (maze[nx][ny].visit_count == 0) {
+            found_unvisited = true;
+            if (maze[nx][ny].distance < min_distance) {
+                min_distance = maze[nx][ny].distance;
+                best_dir = dir;
             }
         }
     }
 
-    // Second pass: if no unvisited, find least visited with lowest distance
+    // Second pass: if no unvisited cells, choose based on distance and visit count
     if (!found_unvisited) {
         for (int p = 0; p < 4; p++) {
-            int dir = priority_dirs[p];
+            int dir = priority[p];
+
+            if (maze[robot.x][robot.y].walls[dir]) continue;
+
             int nx = robot.x + dx[dir];
             int ny = robot.y + dy[dir];
 
-            if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE &&
-                !maze[robot.x][robot.y].walls[dir]) {
+            if (nx < 0 || nx >= MAZE_SIZE || ny < 0 || ny >= MAZE_SIZE) continue;
 
-                int neighbor_dist = maze[nx][ny].distance;
-                int neighbor_visits = maze[nx][ny].visit_count;
+            int nd = maze[nx][ny].distance;
+            int nv = maze[nx][ny].visit_count;
 
-                // Choose based on distance first, then visit count
-                if (neighbor_dist < min_distance ||
-                    (neighbor_dist == min_distance && neighbor_visits < min_visits) ||
-                    (neighbor_dist == min_distance && neighbor_visits == min_visits && dir == robot.direction)) {
-                    min_distance = neighbor_dist;
-                    min_visits = neighbor_visits;
-                    best_dir = dir;
-                }
+            // Choose cell with minimum distance, then minimum visits, then prefer forward
+            if (nd < min_distance ||
+                (nd == min_distance && nv < min_visits) ||
+                (nd == min_distance && nv == min_visits && dir == robot.direction)) {
+                min_distance = nd;
+                min_visits = nv;
+                best_dir = dir;
             }
         }
     }
@@ -223,16 +242,100 @@ int get_championship_direction(void)
 }
 
 /**
- * @brief Update walls based on sensor readings (MMS style)
+ * @brief Turn robot to face the specified direction
  */
-void championship_update_walls(void)
-{
+void turn_to_direction(int target_direction) {
+    int current_dir = robot.direction;
+    int turn_diff = (target_direction - current_dir + 4) % 4;
+
+    switch (turn_diff) {
+        case 0:
+            // Already facing correct direction
+            break;
+        case 1:
+            // Turn right (90 degrees clockwise)
+            send_bluetooth_message("Turning RIGHT...\r\n");
+            turn_right();
+            play_turn_beep();
+            break;
+        case 2:
+            // Turn around (180 degrees)
+            send_bluetooth_message("Turning AROUND...\r\n");
+            turn_around();
+            play_turn_beep();
+            break;
+        case 3:
+            // Turn left (90 degrees counter-clockwise)
+            send_bluetooth_message("Turning LEFT...\r\n");
+            turn_left();
+            play_turn_beep();
+            break;
+    }
+
+    robot.direction = target_direction;
+}
+
+/**
+ * @brief Move forward one cell with precise control
+ */
+bool move_forward_one_cell(void) {
+    send_bluetooth_printf("Moving forward from (%d,%d) to ", robot.x, robot.y);
+
+    // Calculate new position
+    int new_x = robot.x + dx[robot.direction];
+    int new_y = robot.y + dy[robot.direction];
+
+    // Check bounds
+    if (new_x < 0 || new_x >= MAZE_SIZE || new_y < 0 || new_y >= MAZE_SIZE) {
+        send_bluetooth_message("BLOCKED - Out of bounds!\r\n");
+        return false;
+    }
+
+    send_bluetooth_printf("(%d,%d)\r\n", new_x, new_y);
+
+    // Reset PID controllers
+    moveStraightGyroPID_Reset();
+
+    // Use precise encoder-based movement
+    move_forward_distance(ENCODER_COUNTS_PER_CELL);
+
+    // Update robot position
+    robot.x = new_x;
+    robot.y = new_y;
+    robot.exploration_steps++;
+
+    // Mark cell as visited
+    maze[robot.x][robot.y].visited = true;
+    maze[robot.x][robot.y].visit_count++;
+
+    return true;
+}
+
+/**
+ * @brief Check if robot is at goal position
+ */
+bool is_at_goal(void) {
+    if (!robot.center_reached) {
+        // Check if at center
+        return ((robot.x == maze_center_x1 || robot.x == maze_center_x2) &&
+                (robot.y == maze_center_y1 || robot.y == maze_center_y2));
+    } else {
+        // Check if returned to start
+        return (robot.x == 0 && robot.y == 0);
+    }
+}
+
+/**
+ * @brief Update walls based on sensor readings
+ */
+void update_maze_walls(void) {
     // Update sensors first
     update_sensors();
 
-    // Update walls based on current direction
+    // Update wall information based on current direction and sensor readings
     if (sensors.wall_front) {
         maze[robot.x][robot.y].walls[robot.direction] = true;
+
         // Update opposite wall in neighbor cell
         int nx = robot.x + dx[robot.direction];
         int ny = robot.y + dy[robot.direction];
@@ -244,6 +347,7 @@ void championship_update_walls(void)
     if (sensors.wall_left) {
         int left_dir = (robot.direction + 3) % 4;
         maze[robot.x][robot.y].walls[left_dir] = true;
+
         int nx = robot.x + dx[left_dir];
         int ny = robot.y + dy[left_dir];
         if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
@@ -254,6 +358,7 @@ void championship_update_walls(void)
     if (sensors.wall_right) {
         int right_dir = (robot.direction + 1) % 4;
         maze[robot.x][robot.y].walls[right_dir] = true;
+
         int nx = robot.x + dx[right_dir];
         int ny = robot.y + dy[right_dir];
         if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
@@ -261,362 +366,171 @@ void championship_update_walls(void)
         }
     }
 
-    // Mark current cell as visited
-    maze[robot.x][robot.y].visited = true;
-    maze[robot.x][robot.y].visit_count++;
-
-    // Debug output
-    send_bluetooth_printf("Walls updated at (%d,%d) F:%d L:%d R:%d\r\n",
-                         robot.x, robot.y, sensors.wall_front, sensors.wall_left, sensors.wall_right);
-}
-
-/**
- * @brief Turn robot to face target direction (MMS style)
- */
-void turn_to_direction(int target_dir)
-{
-    while (robot.direction != target_dir) {
-        int turn_diff = (target_dir - robot.direction + 4) % 4;
-
-        if (turn_diff == 1) {
-            turn_right();
-            robot.direction = (robot.direction + 1) % 4;
-        } else if (turn_diff == 3) {
-            turn_left();
-            robot.direction = (robot.direction + 3) % 4;
-        } else if (turn_diff == 2) {
-            turn_around();
-            robot.direction = (robot.direction + 2) % 4;
-        }
-    }
-}
-
-// with s-curve
-//void turn_to_direction(int target_dir) {
-//    while (robot.direction != target_dir) {
-//        int turn_diff = (target_dir - robot.direction + 4) % 4;
-//        if (turn_diff == 1) {
-//            turn_right_scurve();  // NEW S-CURVE
-//            // Direction updated inside function
-//        } else if (turn_diff == 3) {
-//            turn_left_scurve();   // NEW S-CURVE
-//            // Direction updated inside function
-//        } else if (turn_diff == 2) {
-//            turn_around_scurve(); // NEW S-CURVE
-//            // Direction updated inside function
-//        }
-//    }
-//}
-
-
-
-/**
- * @brief Enhanced championship move forward with S-curve and gyro stabilization
- */
-bool championship_move_forward(void) {
-    if (mpu9250_is_initialized()) {
-        // Use enhanced S-curve movement with gyro stabilization
-        return championship_move_forward_enhanced();
-    } else {
-        // Fallback to original movement if gyro not available
-        update_sensors();
-
-        if (sensors.wall_front) {
-            send_bluetooth_message("Front wall detected, cannot move\r\n");
-            return false;
-        }
-
-        move_forward();
-        robot.exploration_steps++;
-        exploration_steps++;
-        return true;
-    }
-}
-/**
- * @brief Check if robot is at goal (MMS style)
- */
-bool is_at_goal(void)
-{
-    if (!robot.center_reached) {
-        return (robot.x == goal_x1 || robot.x == goal_x2) &&
-               (robot.y == goal_y1 || robot.y == goal_y2);
-    } else {
-        return robot.x == 0 && robot.y == 0;
+    // Send wall detection feedback
+    if (sensors.wall_front || sensors.wall_left || sensors.wall_right) {
+        send_bluetooth_printf("Walls detected: F:%s L:%s R:%s\r\n",
+                             sensors.wall_front ? "Y" : "N",
+                             sensors.wall_left ? "Y" : "N",
+                             sensors.wall_right ? "Y" : "N");
+        play_wall_beep();
     }
 }
 
 /**
- * @brief Main championship exploration algorithm with MMS integration
+ * @brief Main maze exploration function
  */
-void championship_exploration_with_analysis(void)
-{
-    send_bluetooth_message("Starting championship exploration\r\n");
+void explore_maze(void) {
+    send_bluetooth_message("\r\n🚀 STARTING MAZE EXPLORATION 🚀\r\n");
 
-    int step_count = 0;
-    const int max_steps = 1000;
+    int max_steps = MAZE_SIZE * MAZE_SIZE * 3; // Safety limit
+    int steps = 0;
 
-    while (step_count < max_steps && (!robot.center_reached || !robot.returned_to_start)) {
-        send_bluetooth_printf("Step %d: Robot at (%d,%d)\r\n", step_count, robot.x, robot.y);
+    while (!is_at_goal() && steps < max_steps) {
+        // Update wall information
+        update_maze_walls();
 
-        // Update walls and run championship flood fill
-        championship_update_walls();
-        championship_flood_fill();
+        // Run flood fill algorithm
+        flood_fill_algorithm();
 
-        // Check if goal reached
-        if (is_at_goal()) {
-            if (!robot.center_reached) {
-                send_bluetooth_message("CENTER REACHED! Switching to return mode\r\n");
-                robot.center_reached = true;
-                play_confirmation_tone();
+        // Get best direction to move
+        int best_direction = get_best_direction();
 
-                // Reset visit counts for return journey
-                for (int x = 0; x < MAZE_SIZE; x++) {
-                    for (int y = 0; y < MAZE_SIZE; y++) {
-                        maze[x][y].visit_count = 0;
-                    }
-                }
-            } else {
-                send_bluetooth_message("RETURNED TO START! Exploration complete!\r\n");
-                robot.returned_to_start = true;
-                break;
-            }
-        }
+        // Turn to face best direction
+        turn_to_direction(best_direction);
 
-        // Get championship direction
-        int next_dir = get_championship_direction();
-        send_bluetooth_printf("Championship direction: %d\r\n", next_dir);
+        // Move forward if possible
+        if (!move_forward_one_cell()) {
+            send_bluetooth_message("❌ Movement failed! Trying alternative...\r\n");
 
-        // Turn and move
-        turn_to_direction(next_dir);
+            // Try alternative directions
+            for (int alt_dir = 0; alt_dir < 4; alt_dir++) {
+                if (alt_dir != best_direction &&
+                    !maze[robot.x][robot.y].walls[alt_dir]) {
 
-        if (championship_move_forward()) {
-            // Update LED status
-            if (robot.center_reached) {
-                led_status(0, 1); // Right LED for return journey
-            } else {
-                led_status(1, 0); // Left LED for exploration
-            }
-        } else {
-            send_bluetooth_message("Movement blocked - trying alternatives\r\n");
-            // Try other directions if blocked
-            bool moved = false;
-            for (int alt_dir = 0; alt_dir < 4 && !moved; alt_dir++) {
-                if (alt_dir != next_dir) {
-                    int nx = robot.x + dx[alt_dir];
-                    int ny = robot.y + dy[alt_dir];
-                    if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE &&
-                        !maze[robot.x][robot.y].walls[alt_dir]) {
-                        turn_to_direction(alt_dir);
-                        if (championship_move_forward()) {
-                            moved = true;
-                        }
+                    turn_to_direction(alt_dir);
+                    if (move_forward_one_cell()) {
+                        break;
                     }
                 }
             }
-
-            if (!moved) {
-                send_bluetooth_message("All directions blocked!\r\n");
-                break;
-            }
         }
 
-        step_count++;
-        HAL_Delay(10); // Small delay for stability
-    }
-
-    // Final status
-    led_status(0, 0);
-    send_bluetooth_printf("Exploration completed in %d moves\r\n", robot.exploration_steps);
-
-    // Execute perfect path analysis if exploration successful
-    if (robot.center_reached && robot.returned_to_start) {
-        send_bluetooth_message("\r\nExploration successful! Starting path analysis...\r\n");
-        execute_championship_path_analysis();
-        play_success_tone();
-    } else {
-        send_bluetooth_message("Exploration incomplete - path analysis not available\r\n");
-        play_error_tone();
-    }
-}
-
-/**
- * @brief Execute championship path analysis (MMS style)
- */
-void execute_championship_path_analysis(void)
-{
-    send_bluetooth_message("\r\n=== CHAMPIONSHIP PATH ANALYSIS ===\r\n");
-
-    // Calculate optimal path from explored areas
-    calculate_optimal_path_from_explored_areas();
-
-    // Comprehensive maze performance analysis
-    analyze_championship_maze_performance();
-
-    // Print optimal distance map
-    print_championship_distance_map();
-
-    // Visualize optimal path (would work with MMS visualization)
-    send_bluetooth_message("\r\n🎯 CHAMPIONSHIP ANALYSIS COMPLETE!\r\n");
-
-    if (theoretical_minimum < MAX_DISTANCE) {
-        send_bluetooth_printf("Optimal path through explored areas: %d steps!\r\n", theoretical_minimum);
-        send_bluetooth_message("✅ Ready for IEEE Micromouse competition!\r\n");
-    } else {
-        send_bluetooth_message("❌ No valid path found through explored areas\r\n");
-    }
-}
-
-/**
- * @brief Reset championship micromouse to initial state
- */
-void reset_championship_micromouse(void)
-{
-    robot.x = 0;
-    robot.y = 0;
-    robot.direction = NORTH;
-    robot.center_reached = false;
-    robot.returned_to_start = false;
-    robot.exploration_steps = 0;
-
-    exploration_steps = 0;
-    theoretical_minimum = 0;
-
-    initialize_championship_maze();
-    send_bluetooth_message("Championship micromouse reset to initial state\r\n");
-    play_startup_tone();
-}
-
-/**
- * @brief Championship speed run with MMS path analysis
- */
-void championship_speed_run(void)
-{
-    send_bluetooth_message("\r\n🚀 CHAMPIONSHIP SPEED RUN MODE!\r\n");
-    send_bluetooth_message("Using MMS optimal path analysis\r\n");
-
-    // Use the advanced speed run implementation
-    speed_run();
-}
-
-
-
-/**
- * @brief Simple speed run implementation
- */
-void speed_run(void)
-{
-    send_bluetooth_message("\r\n🚀 SPEED RUN MODE ACTIVATED!\r\n");
-
-    // Check if exploration was completed
-    if (!robot.center_reached || !robot.returned_to_start) {
-        send_bluetooth_message("❌ Speed run not available - exploration not complete\r\n");
-        return;
-    }
-
-    send_bluetooth_message("Using championship algorithms for optimal speed run\r\n");
-
-    // Reset robot position
-    robot.x = 0;
-    robot.y = 0;
-    robot.direction = NORTH;
-
-    // Status indication
-    led_status(1, 1); // Both LEDs on
-    play_confirmation_tone();
-
-    // Wait for confirmation
-    send_bluetooth_message("Press RIGHT button to execute speed run...\r\n"); //later change to hand movement
-
-    uint32_t start_time = HAL_GetTick();
-    bool execute_run = false;
-
-    while ((HAL_GetTick() - start_time) < 10000) { // 10 second timeout
-        if (button_pressed == 2) { // Right button
-            button_pressed = 0;
-            execute_run = true;
-            break;
+        // Send periodic status updates
+        if (steps % 5 == 0) {
+            send_bluetooth_printf("Step %d: Position (%d,%d), Direction: %s\r\n",
+                                 steps, robot.x, robot.y, get_direction_name(robot.direction));
+            send_maze_state();
         }
+
+        steps++;
+
+        // Brief delay for stability
         HAL_Delay(100);
     }
 
-    if (!execute_run) {
-        send_bluetooth_message("⏰ Speed run cancelled - timeout\r\n");
-        led_status(0, 0);
-        return;
-    }
+    if (is_at_goal()) {
+        if (!robot.center_reached) {
+            robot.center_reached = true;
+            send_bluetooth_message("🎯 CENTER REACHED! 🎯\r\n");
+            play_success_tone();
 
-    send_bluetooth_message("🏁 EXECUTING SPEED RUN!\r\n");
+            // Brief celebration
+            led_sequence_complete();
+            HAL_Delay(2000);
 
-    // Simple speed run - follow the shortest known path to center
-    int moves = 0;
-    const int max_moves = 50;
-
-    while (!((robot.x == goal_x1 || robot.x == goal_x2) &&
-             (robot.y == goal_y1 || robot.y == goal_y2)) &&
-           moves < max_moves) {
-
-        // Update sensor data
-        update_sensors();
-
-        // Use championship flood fill to get direction
-        championship_flood_fill();
-        int next_dir = get_championship_direction();
-
-        // Turn to target direction
-        turn_to_direction(next_dir);
-
-        // Move forward
-        if (championship_move_forward()) {
-            moves++;
-            send_bluetooth_printf("Speed run move %d to (%d,%d)\r\n", moves, robot.x, robot.y);
+            send_bluetooth_message("Now returning to start...\r\n");
         } else {
-            send_bluetooth_message("❌ Speed run blocked!\r\n");
-            break;
+            robot.returned_to_start = true;
+            send_bluetooth_message("🏁 RETURNED TO START! 🏁\r\n");
+            play_success_tone();
+            led_sequence_complete();
+            exploration_completed = 1;
         }
-
-        // Brief delay for stability
-        HAL_Delay(50);
-    }
-
-    // Speed run complete
-    led_status(0, 0);
-
-    if ((robot.x == goal_x1 || robot.x == goal_x2) &&
-        (robot.y == goal_y1 || robot.y == goal_y2)) {
-        send_bluetooth_message("🏁 SPEED RUN SUCCESS!\r\n");
-        send_bluetooth_printf("Completed in %d moves\r\n", moves);
-        play_success_tone();
     } else {
-        send_bluetooth_message("⚠️ Speed run incomplete\r\n");
+        send_bluetooth_printf("❌ Exploration incomplete after %d steps\r\n", max_steps);
         play_error_tone();
+        led_sequence_error();
     }
+
+    send_bluetooth_printf("Total exploration steps: %d\r\n", robot.exploration_steps);
 }
 
-
-
-
-
-
 /**
- * @brief Get exploration efficiency percentage
+ * @brief Run complete maze exploration sequence
  */
-float get_exploration_efficiency(void)
-{
-    int cells_visited = 0;
-    for (int x = 0; x < MAZE_SIZE; x++) {
-        for (int y = 0; y < MAZE_SIZE; y++) {
-            if (maze[x][y].visited) {
-                cells_visited++;
+void run_maze_exploration_sequence(void) {
+    //send_bluetooth_message("\r\n" "=" * 50 "\r\n");
+    send_bluetooth_message("🐭 MICROMOUSE MAZE EXPLORATION 🐭\r\n");
+    //send_bluetooth_message("=" * 50 "\r\n");
+
+    // Phase 1: Exploration to center
+    if (!robot.center_reached) {
+        send_bluetooth_message("Phase 1: Exploring to center...\r\n");
+        led_sequence_exploring();
+        explore_maze();
+    }
+
+    // Phase 2: Return to start
+    if (robot.center_reached && !robot.returned_to_start) {
+        send_bluetooth_message("Phase 2: Returning to start...\r\n");
+        led_sequence_returning();
+        HAL_Delay(1000);
+        explore_maze();
+    }
+
+    // Phase 3: Report results
+    if (robot.returned_to_start) {
+        send_bluetooth_message("\r\n" "🏆 EXPLORATION COMPLETE! 🏆" "\r\n");
+        send_performance_metrics();
+
+        // Calculate exploration efficiency
+        int total_cells = MAZE_SIZE * MAZE_SIZE;
+        int visited_cells = 0;
+        for (int x = 0; x < MAZE_SIZE; x++) {
+            for (int y = 0; y < MAZE_SIZE; y++) {
+                if (maze[x][y].visited) visited_cells++;
             }
         }
+
+        float exploration_percentage = (float)visited_cells / total_cells * 100.0f;
+        send_bluetooth_printf("Exploration Coverage: %d/%d cells (%.1f%%)\r\n",
+                             visited_cells, total_cells, exploration_percentage);
+
+        // Ready for speed run (future implementation)
+        send_bluetooth_message("🚀 Ready for speed run optimization! 🚀\r\n");
+
+        exploration_completed = 1;
     }
-    return (float)cells_visited / (MAZE_SIZE * MAZE_SIZE) * 100.0f;
 }
 
 /**
- * @brief Get optimal distance to center
+ * @brief Check if exploration is complete
  */
-int get_optimal_distance(void)
-{
-    return theoretical_minimum;
+bool is_exploration_complete(void) {
+    return exploration_completed;
+}
+
+/**
+ * @brief Get exploration efficiency
+ */
+float get_exploration_efficiency(void) {
+    if (robot.exploration_steps == 0) return 0.0f;
+
+    // Calculate theoretical minimum (Manhattan distance)
+    int min_to_center = abs(maze_center_x1) + abs(maze_center_y1);
+    int min_to_start = abs(maze_center_x1 - 0) + abs(maze_center_y1 - 0);
+    int theoretical_min = min_to_center + min_to_start;
+
+    if (theoretical_min == 0) return 100.0f;
+
+    return ((float)theoretical_min / robot.exploration_steps) * 100.0f;
+}
+
+/**
+ * @brief Get optimal distance for current maze knowledge
+ */
+int get_optimal_distance(void) {
+    // This would implement A* or similar for optimal path calculation
+    // For now, return the flood fill distance to center
+    return maze[0][0].distance;
 }

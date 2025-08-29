@@ -2,10 +2,10 @@
 ../Core/Src/sensors.c:46:6:turn_off_emitters	1
 ../Core/Src/sensors.c:57:10:read_adc_channel	4
 ../Core/Src/sensors.c:98:6:update_sensors	17
-../Core/Src/sensors.c:195:6:update_walls	16
-../Core/Src/sensors.c:237:6:is_sensor_calibration_valid	1
-../Core/Src/sensors.c:245:6:send_detailed_sensor_status	5
-../Core/Src/sensors.c:288:6:adc_system_diagnostics	9
-../Core/Src/sensors.c:332:6:diagnostic_sensor_test	2
-../Core/Src/sensors.c:379:6:calibrate_sensors	27
-../Core/Src/sensors.c:615:10:get_calibrated_threshold	5
+../Core/Src/sensors.c:194:6:update_walls	16
+../Core/Src/sensors.c:236:6:is_sensor_calibration_valid	1
+../Core/Src/sensors.c:244:6:send_detailed_sensor_status	5
+../Core/Src/sensors.c:287:6:adc_system_diagnostics	9
+../Core/Src/sensors.c:331:6:diagnostic_sensor_test	2
+../Core/Src/sensors.c:378:6:calibrate_sensors	27
+../Core/Src/sensors.c:614:10:get_calibrated_threshold	5
