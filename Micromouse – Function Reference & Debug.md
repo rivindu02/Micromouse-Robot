@@ -2,7 +2,7 @@
 
 # Championship Micromouse – Function Reference \& Debug Guide
 
-*Last Updated: August 19, 2025*
+*Last Updated: August 29, 2025*
 
 This document explains the purpose of each module and key functions, and provides a step-by-step debugging workflow.
 
@@ -103,27 +103,36 @@ This document explains the purpose of each module and key functions, and provide
 
 - Helper routines: `map_value()`, `constrain_int()`, `performance_start_timer()`, etc.
 
+### 10. logging_tests.c
 
-### 10. velocity_profile.c
+- **`test_sensor_readings()`**
+- Comprehensive sensor testing and calibration functions
+- Logs sensor data for analysis and debugging
+- **`performance_logging()`**
+- Records system performance metrics during operation
+- Helps optimize algorithm parameters for competition
+- **`debug_maze_state()`**
+- Outputs current maze knowledge and robot state
+- Useful for understanding exploration progress and decision making
 
-- **`velocity_profile_init()`**
-- Initializes velocity profile for smooth acceleration/deceleration
-- Sets maximum velocity, acceleration parameters, and distance targets
-- **`velocity_profile_update()`**
-- Updates current velocity based on trapezoidal motion profile
-- Handles acceleration, constant velocity, and deceleration phases
-- **`velocity_profile_get_target_velocity()`**
-- Returns current target velocity for motor control
-- **`velocity_profile_is_complete()`**
-- Checks if the velocity profile execution is finished
+## 🔬 Data Analysis Tools
 
-### 11. state_machine.h
+### Python Analysis Scripts (Core Directory)
+- **`gyro_turns.py`**: Analyzes gyroscope data from CSV logs to optimize turn detection
+- **`pid.py`**: PID controller analysis and parameter tuning based on performance data
 
-- **State Management System**
-- Defines main micromouse states: IDLE, CALIBRATE, SEARCH_RUN, RETURN_TO_START, PREPARE_FAST, FAST_RUN, COMPLETE, ERROR
-- Movement execution states for various turn types and diagonal movements
-- Search behavior states for exploration strategies
-- Provides structured state management for complex micromouse operations
+### Performance Data Logs
+- **`log_encoder.csv`**: Encoder performance and calibration data
+- **`log_encoder2.csv`**: Extended encoder testing results  
+- **`log_encoder3.csv`**: Additional encoder validation data
+- **`log_gyro.csv`**: Gyroscope readings for drift analysis
+- **`log_gyro_turns.csv`**: Turn detection accuracy measurements
+
+These tools enable:
+- **Real-time Data Collection**: Automated logging during robot operation
+- **Offline Analysis**: Python scripts for detailed performance evaluation
+- **Parameter Optimization**: Data-driven tuning of sensor thresholds and movement parameters
+- **Competition Preparation**: Statistical analysis for consistent performance
 
 
 ## 🐞 Debugging Workflow
@@ -158,10 +167,18 @@ This document explains the purpose of each module and key functions, and provide
     - Verify printed map matches expected visited cells
 7. **Speed Run**
     - After exploration, press left button again
-    - Monitor velocity profile updates and state transitions
-    - Verify smooth acceleration/deceleration curves
-    - Check state machine transitions between movement states
-8. **IMU Verification**
+    - System uses optimal path calculated during exploration
+    - Monitor acceleration and movement timing
+8. **Debug Functions**
+    - Use functions in `logging_tests.c` for detailed debugging
+    - Test individual sensors with `test_sensor_readings()`
+    - Monitor performance with `performance_logging()`
+    - Export data to CSV files for offline analysis
+9. **Data Analysis**
+    - Use `gyro_turns.py` to analyze turn performance from CSV logs
+    - Run `pid.py` for PID controller optimization
+    - Review CSV files for sensor calibration and performance trends
+10. **IMU Verification**
     - Use `mpu9250_detect_turn()` prints to confirm gyro integration during turns
 
 ## 🛠 Tips \& Tricks
@@ -171,26 +188,32 @@ This document explains the purpose of each module and key functions, and provide
 - **Scope Signals**: verify PWM on speaker and motors with oscilloscope.
 - **Comment Out** modules (e.g. remove `speed_run()`) to isolate bugs.
 - **Adjust Thresholds** in `micromouse.h` when false positives occur.
+- **Data Analysis Workflow**: 
+  - Export sensor/performance data to CSV during testing
+  - Use Python scripts for offline analysis and parameter optimization
+  - Import optimized parameters back into embedded code
+- **Systematic Testing**: Use logging functions to validate each subsystem independently
 
 You now have a complete function reference and structured debugging plan to validate every subsystem—from hardware to championship algorithms—and ensure reliability in international competition. Good luck!
 
-## 🔄 Recent Updates (August 19, 2025)
+## 🔄 Recent Updates (August 29, 2025)
 
-### New Modules Added:
-- **`velocity_profile.h/.c`**: Advanced motion control with trapezoidal velocity profiling
-- **`state_machine.h`**: Comprehensive state management system for robust operation
+### Current Implementation Status:
+- **Core modules implemented**: All basic micromouse functionality is complete
+- **`logging_tests.h/.c`**: Comprehensive debugging and testing functions
+- **Hardware Integration**: Full STM32F411 peripheral support with optimized drivers
 
-### Architecture Improvements:
-- **Enhanced Movement Control**: Smooth acceleration/deceleration curves for improved accuracy
-- **State-Based Design**: Structured state machine for complex behavior management
-- **Advanced Motion Planning**: Velocity profiling system for professional-grade movement
-- **Modular Expansion**: New modules support future advanced features like diagonal movement
+### Architecture Features:
+- **Modular Design**: Clean separation between sensors, movement, algorithms, and communication
+- **Professional Documentation**: Updated function reference and debugging guides
+- **Robust Testing**: Integrated test functions for validation and debugging
+- **Competition Ready**: All essential features implemented for micromouse competitions
 
-### Updated File Structure:
-- Velocity profiling integrated into movement system
-- State machine architecture for better code organization
-- Enhanced debugging capabilities with state monitoring
-- Improved documentation reflecting current implementation
+### File Structure Updates:
+- All documented modules are implemented and functional
+- Logging and testing capabilities integrated throughout
+- Enhanced debugging workflows for development and competition preparation
+- Professional code organization following embedded systems best practices
 
 <div style="text-align: center">⁂</div>
 

@@ -1,6 +1,6 @@
 # Micromouse Project v1.0
 
-*Last Updated: August 19, 2025*
+*Last Updated: August 29, 2025*
 
 ## 🏆 Overview
 
@@ -39,35 +39,40 @@ This is a championship-level micromouse implementation designed for **internatio
 ## 📁 File Structure
 
 ```
-Core/Inc/
-  ├─ main.h
-  ├─ micromouse.h
-  ├─ championship_analysis.h
-  ├─ movement.h
-  ├─ sensors.h
-  ├─ audio.h
-  ├─ communication.h
-  ├─ gyro.h
-  ├─ utils.h
-  ├─ state_machine.h
-  └─ velocity_profile.h
-
-Core/Src/
-  ├─ main.c                    // Hardware initialization & main loop
-  ├─ micromouse.c              // Core algorithms (exploration, flood fill)
-  ├─ championship_analysis.c   // Path analysis & performance functions
-  ├─ movement.c                // Motor control & encoder movement
-  ├─ sensors.c                 // IR sensor reading & wall detection
-  ├─ audio.c                   // Speaker PWM control & tones
-  ├─ communication.c           // Bluetooth transmit functions
-  ├─ gyro.c                    // MPU9250 IMU interface
-  ├─ utils.c                   // Helper functions (mapping, constrain, etc.)
-  ├─ velocity_profile.c        // Advanced velocity profiling for smooth movement
-  ├─ stm32f4xx_hal_msp.c       // HAL MSP initialization
-  ├─ stm32f4xx_it.c            // Interrupt handlers
-  ├─ syscalls.c                // Newlib syscalls
-  ├─ sysmem.c                  // Heap management
-  └─ system_stm32f4xx.c        // System clock & startup code
+Core/
+  ├─ gyro_turns.py             // Python analysis of gyroscope turn data
+  ├─ pid.py                    // PID controller analysis and tuning
+  ├─ log_encoder.csv           // Encoder performance data logs
+  ├─ log_encoder2.csv          // Additional encoder test data
+  ├─ log_encoder3.csv          // Extended encoder calibration data
+  ├─ log_gyro.csv              // Gyroscope sensor data logs
+  ├─ log_gyro_turns.csv        // Turn detection analysis data
+  ├─ Inc/
+  │   ├─ main.h
+  │   ├─ micromouse.h
+  │   ├─ movement.h
+  │   ├─ sensors.h
+  │   ├─ audio.h
+  │   ├─ communication.h
+  │   ├─ gyro.h
+  │   ├─ utils.h
+  │   ├─ logging_tests.h
+  │   └─ stm32f4xx_hal_conf.h
+  └─ Src/
+      ├─ main.c                // Hardware initialization & main loop
+      ├─ micromouse.c          // Core algorithms (exploration, flood fill)
+      ├─ movement.c            // Motor control & encoder movement
+      ├─ sensors.c             // IR sensor reading & wall detection
+      ├─ audio.c               // Speaker PWM control & tones
+      ├─ communication.c       // Bluetooth transmit functions
+      ├─ gyro.c                // MPU9250 IMU interface
+      ├─ utils.c               // Helper functions (mapping, constrain, etc.)
+      ├─ logging_tests.c       // Debugging and test functions
+      ├─ stm32f4xx_hal_msp.c   // HAL MSP initialization
+      ├─ stm32f4xx_it.c        // Interrupt handlers
+      ├─ syscalls.c            // Newlib syscalls
+      ├─ sysmem.c              // Heap management
+      └─ system_stm32f4xx.c    // System clock & startup code
 ```
 
 ## 🚀 Key Features
@@ -181,27 +186,6 @@ The system provides detailed performance analysis:
 – `get_championship_direction()`: chooses next move (straight, right, left, back)
 – `championship_exploration_with_analysis()`: full exploration + return
 
-### `championship_analysis.c`
-
-– `calculate_optimal_path_from_explored_areas()`: flood fill only visited cells
-– `analyze_championship_maze_performance()`: computes efficiency, ratings
-– `print_championship_distance_map()`: outputs distance map via Bluetooth
-– Visualization and diagnostics helpers
-
-### `velocity_profile.c`
-
-– `velocity_profile_init()`: initializes smooth motion profiles
-– `velocity_profile_update()`: updates target velocity using trapezoidal profile
-– `velocity_profile_get_target_velocity()`: returns current velocity target
-– Advanced acceleration/deceleration control for precise movement
-
-### `state_machine.h`
-
-– Defines comprehensive state management system
-– Main states: exploration, return, fast run, calibration
-– Movement states: forward, turns, diagonals, curves
-– Search behavior states for different exploration strategies
-
 ### `movement.c`
 
 – `move_forward()`, `turn_left()`, `turn_right()`, `turn_around()` with encoder feedback
@@ -221,6 +205,30 @@ The system provides detailed performance analysis:
 ### `utils.c`
 
 – Mapping, constrain, performance timers, LED sequences
+
+### `logging_tests.c`
+
+– Test functions for debugging sensor readings and system performance
+– Data logging utilities for performance analysis
+
+## 🔬 Data Analysis Tools
+
+### Python Analysis Scripts
+- **`gyro_turns.py`**: Analyzes gyroscope data during turn maneuvers
+- **`pid.py`**: PID controller tuning and performance analysis
+
+### Performance Data Logs
+- **`log_encoder.csv`**: Encoder accuracy and calibration data
+- **`log_encoder2.csv`**: Additional encoder performance metrics
+- **`log_encoder3.csv`**: Extended encoder testing data
+- **`log_gyro.csv`**: Gyroscope sensor readings and drift analysis
+- **`log_gyro_turns.csv`**: Turn detection accuracy and timing data
+
+These tools provide comprehensive analysis capabilities for:
+- **Sensor Calibration**: Fine-tuning thresholds and parameters
+- **Performance Optimization**: Analyzing movement accuracy and timing
+- **Algorithm Validation**: Verifying navigation and pathfinding performance
+- **Competition Preparation**: Data-driven optimization for championship performance
 
 
 ## 🏁 Competition Usage
@@ -287,8 +295,8 @@ This implementation meets **IEEE Micromouse competition standards**:
 - **Comprehensive error handling** and logging
 - **Professional documentation** and code comments
 - **International coding standards** compliance
-- **Advanced state machine** for robust operation management
-- **Velocity profiling system** for smooth and precise movement
+- **Advanced debugging capabilities** with test functions
+- **Robust sensor integration** for reliable operation
 
 ## 📈 Expected Competition Results
 
