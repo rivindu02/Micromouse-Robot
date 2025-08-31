@@ -11,8 +11,11 @@ void break_motors(void);
 void move_forward_distance(int distance_mm);
 void move_forward_adaptive_speed(float speed_multiplier);
 void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool forward, uint16_t duty);
-void moveStraightPID(void);
-
+void moveStraightPID(int base_pwm, bool left_forward, bool right_forward);
+void moveStraightGyroPID(void);
+void moveStraightGyroPID_Reset(void);
+static float gyro_rate_pid_step(float sp_dps, float meas_dps, float *p_dt);
+void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms) ;
 // Enhanced encoder functions
 int32_t get_left_encoder_total(void);
 int32_t get_right_encoder_total(void);

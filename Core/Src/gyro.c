@@ -293,6 +293,7 @@ float mpu9250_get_gyro_z_dps(void)
 {
     // ±500 dps range, 16-bit resolution
     // Sensitivity: 65.5 LSB/(dps)
+
     return (float)gyro.gyro_z / 65.5f;
 }
 

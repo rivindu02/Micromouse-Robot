@@ -147,22 +147,40 @@ int main(void)
   MX_TIM4_Init();
   MX_USART6_UART_Init();
   MX_TIM3_Init();
+
+
   /* USER CODE BEGIN 2 */
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);   // PA6  (MOTOR_IN1)
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);   // PA7  (MOTOR_IN2)
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);   // PB0  (MOTOR_IN3)
+  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);   // PB1  (MOTOR_IN4)
+  HAL_GPIO_WritePin(MOTOR_STBY_GPIO_Port, MOTOR_STBY_Pin, GPIO_PIN_SET); // wake DRV8833
+
   /* Initialize micromouse system */
   championship_micromouse_init();
-  verify_adc_gpio_configuration();
-  adc_system_diagnostics();
+  verify_adc_gpio_configuration(); // Missed configurations for adc
+  adc_system_diagnostics();	// verify adc system settings and check ADC channels individually
+
 
   // Check gyro initialization
   if (mpu9250_is_initialized()) {
 	  send_bluetooth_message("Calibrating gyro for heading control...\r\n");
 	  send_bluetooth_message("⚠️ KEEP ROBOT STATIONARY during calibration!\r\n");
 	  HAL_Delay(2000);  // Give user time to see message
+	  // bias shud run before getting any gyro values////////////////////////////////////////////
 	  mpu9250_calibrate_bias();
 	  send_bluetooth_message("✅ Gyro calibration complete\r\n");
 
 	  // Set initial conservative PID gains
-	  set_heading_pid_gains(1.0f, 0.0f, 0.1f);
+	  set_heading_pid_gains(1.0f, 0.0f, 0.1f); /// used for scurved PID
+//	  while(1){
+//		  mpu9250_read_all();
+//		  mpu9250_get_gyro_z_dps();// get the raw reading from gyro
+//		  mpu9250_send_status();
+//		  HAL_Delay(500);
+//
+//	  }
+
   } else {
 	  send_bluetooth_message("⚠️ Gyro not available - using basic movement\r\n");
   }
@@ -170,10 +188,11 @@ int main(void)
 
 
   //mpu9250_send_status();
+  turn_in_place_gyro( 90.0f, 650, 2500);  // left 90°
 
 
-
-
+  // run a left-turn step test
+  //run_gyro_turn_step_test(600, 150, 1000, 2000, 10, 3000);
 
 
 
@@ -184,25 +203,33 @@ int main(void)
 //      send_bluetooth_message("❌ CRITICAL: All sensors reading zero - ADC failure!\r\n");
 //  }
 //
-//  // Test encoder functionality
-//  start_encoders();
-//  reset_encoder_totals();
-//  HAL_Delay(100);
+  // Test encoder functionality
+  start_encoders();
+  HAL_Delay(100);
+  //for encoder PID csv generation////////////////////////////////
+  send_bluetooth_printf("TEST HAL_GetTick=%lu\r\n", (unsigned long)HAL_GetTick());
+  send_bluetooth_printf("LeftEnc=%ld RightEnc=%ld\r\n", (long)get_left_encoder_total(), (long)get_right_encoder_total());
+
+  //run_gyro_step_test(600, 100, 1000, 2500, 10, 3000); // base=600, delta=100, start=1000ms, hold 2500ms, sample=10ms, total=3000ms
+
+   //use gyro PID/////////////////////////////////////////////////////////////
+//  moveStraightGyroPID_Reset();
+//  moveStraightPID_Reset();
+//  while(1){//get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
+//	  mpu9250_read_gyro();
 //
-//  while(get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
-//	  moveStraightPID();
+//	  moveStraightGyroPID();
 //	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
 //  }
 //  break_motors();
-//
-//  HAL_Delay(100);
+
+  HAL_Delay(100);
 
 
 //  debug_encoder_setup();
 //  test_encoder_manual();
 //  test_encoder_rotation();
-//  left_test = get_left_encoder_total();
-//  right_test = get_right_encoder_total();
+
 
   if (get_left_encoder_total() == 0 && get_right_encoder_total() == 0) {
       send_bluetooth_message("⚠️ WARNING: Encoders may not be working\r\n");
@@ -229,11 +256,11 @@ int main(void)
 
   /* Wait for start button */
   send_bluetooth_message("Press button to start exploration...\r\n");
-//  while (!start_flag) {
-//      HAL_Delay(10);
-//      // Blink LED to show ready state
-//      HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin);
-//  }
+  while (!start_flag) {
+      HAL_Delay(10);
+      // Blink LED to show ready state
+      HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin);
+  }
 
   /* Reset LEDs */
   HAL_GPIO_WritePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin, GPIO_PIN_RESET);
@@ -247,13 +274,15 @@ int main(void)
   send_bluetooth_message("Starting maze exploration...\r\n");
 
   /* Initialize movement system */
+
+  // get ADC Values//////////////////////////////////////////////////////
   start_encoders();
-  calibrate_sensors();
-  while(1){
-	  //update_sensors();
-	  diagnostic_sensor_test();
-	  HAL_Delay(500);
-  }
+//  calibrate_sensors();
+//  while(1){
+//	  //update_sensors();
+//	  diagnostic_sensor_test();
+//	  HAL_Delay(500);
+//  }
 
   /* Execute championship exploration */
   championship_exploration_with_analysis();

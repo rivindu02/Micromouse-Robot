@@ -3,6 +3,7 @@
 "./Core/Src/communication.o"
 "./Core/Src/enhanced_movement.o"
 "./Core/Src/gyro.o"
+"./Core/Src/logging_tests.o"
 "./Core/Src/main.o"
 "./Core/Src/micromouse.o"
 "./Core/Src/movement.o"

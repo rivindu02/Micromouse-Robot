@@ -8,5 +8,5 @@
 ../Core/Src/gyro.c:246:6:mpu9250_read_accel	24	static
 ../Core/Src/gyro.c:283:6:mpu9250_read_all	8	static
 ../Core/Src/gyro.c:292:7:mpu9250_get_gyro_z_dps	4	static
-../Core/Src/gyro.c:303:6:mpu9250_detect_turn	16	static
-../Core/Src/gyro.c:318:6:mpu9250_send_status	32	static
+../Core/Src/gyro.c:304:6:mpu9250_detect_turn	16	static
+../Core/Src/gyro.c:319:6:mpu9250_send_status	32	static

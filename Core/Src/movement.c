@@ -8,6 +8,7 @@
 
 #include "micromouse.h"
 #include "velocity_profile.h"
+#include "movement.h"
 #include <stdlib.h> // for abs() function
 
 // FIXED: Add static variables for proper encoder overflow tracking
@@ -15,6 +16,9 @@ static uint16_t last_left_count = 32768;
 static uint16_t last_right_count = 32768;
 static int32_t left_total = 0;
 static int32_t right_total = 0;
+
+#define PWM_MIN_MOVE_LEFT   510
+#define PWM_MIN_MOVE_RIGHT  490
 
 /**
  * @brief Update encoder totals with proper overflow handling - NEW FUNCTION
@@ -136,56 +140,67 @@ void move_forward(void)
 /**
  * @brief Turn left 90 degrees - FIXED VERSION (removed unused variables)
  */
+//void turn_left(void) {
+//    // REMOVED: unused variable 'start_left'
+//    int32_t start_right = get_right_encoder_total();
+//
+//
+//    // Left motor reverse, right motor forward
+//	motor_set_fixed(0, false, 800); // Left reverse
+//	motor_set_fixed(1, true, 800);  // Right forward
+//
+//    int32_t target_counts = ENCODER_COUNTS_PER_TURN;
+//    while (1) {
+//        int32_t current_right = get_right_encoder_total();
+//        int32_t right_traveled = abs(current_right - start_right);
+//
+//        if (right_traveled >= target_counts) {
+//            break;
+//        }
+//        HAL_Delay(1);
+//    }
+//
+//    stop_motors();
+//    robot.direction = (robot.direction + 3) % 4; // Turn left
+//    HAL_Delay(200);
+//}
+//
+///**
+// * @brief Turn right 90 degrees - FIXED VERSION (removed unused variables)
+// */
+//void turn_right(void) {
+//    int32_t start_left = get_left_encoder_total();
+//    // REMOVED: unused variable 'start_right'
+//
+//    // Left motor forward, right motor backward
+//    motor_set_fixed(0, true, 800);  // Left forward
+//    motor_set_fixed(1, false, 800); // Right reverse
+//
+//    int32_t target_counts = ENCODER_COUNTS_PER_TURN;
+//    while (1) {
+//        int32_t current_left = get_left_encoder_total();
+//        int32_t left_traveled = abs(current_left - start_left);
+//
+//        if (left_traveled >= target_counts) {
+//            break;
+//        }
+//        HAL_Delay(1);
+//    }
+//
+//    stop_motors();
+//    robot.direction = (robot.direction + 1) % 4; // Turn right
+//    HAL_Delay(200);
+//}
+
 void turn_left(void) {
-    // REMOVED: unused variable 'start_left'
-    int32_t start_right = get_right_encoder_total();
-
-
-    // Left motor reverse, right motor forward
-	motor_set_fixed(0, false, 800); // Left reverse
-	motor_set_fixed(1, true, 800);  // Right forward
-
-    int32_t target_counts = ENCODER_COUNTS_PER_TURN;
-    while (1) {
-        int32_t current_right = get_right_encoder_total();
-        int32_t right_traveled = abs(current_right - start_right);
-
-        if (right_traveled >= target_counts) {
-            break;
-        }
-        HAL_Delay(1);
-    }
-
-    stop_motors();
-    robot.direction = (robot.direction + 3) % 4; // Turn left
-    HAL_Delay(200);
+    // turn 90 degrees left using gyro PID, 1200 ms timeout for safety
+    turn_in_place_gyro(+90.0f, 520, 1200);
+    robot.direction = (robot.direction + 3) % 4;
 }
 
-/**
- * @brief Turn right 90 degrees - FIXED VERSION (removed unused variables)
- */
 void turn_right(void) {
-    int32_t start_left = get_left_encoder_total();
-    // REMOVED: unused variable 'start_right'
-
-    // Left motor forward, right motor backward
-    motor_set_fixed(0, true, 800);  // Left forward
-    motor_set_fixed(1, false, 800); // Right reverse
-
-    int32_t target_counts = ENCODER_COUNTS_PER_TURN;
-    while (1) {
-        int32_t current_left = get_left_encoder_total();
-        int32_t left_traveled = abs(current_left - start_left);
-
-        if (left_traveled >= target_counts) {
-            break;
-        }
-        HAL_Delay(1);
-    }
-
-    stop_motors();
-    robot.direction = (robot.direction + 1) % 4; // Turn right
-    HAL_Delay(200);
+    turn_in_place_gyro(-90.0f, 520, 1200);
+    robot.direction = (robot.direction + 1) % 4;
 }
 
 /**
@@ -227,14 +242,16 @@ void move_forward_distance(int distance_mm) {
     // FIXED: Use safe encoder reading
     int32_t start_left = get_left_encoder_total();
     int32_t start_right = get_right_encoder_total();
-
+    reset_encoder_totals();
     // Set motors to move forward
-    HAL_GPIO_WritePin(MOTOR_IN1_GPIO_Port, MOTOR_IN1_Pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, GPIO_PIN_RESET);
-    HAL_GPIO_WritePin(MOTOR_IN3_GPIO_Port, MOTOR_IN3_Pin, GPIO_PIN_SET);
-    HAL_GPIO_WritePin(MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, GPIO_PIN_RESET);
+//    HAL_GPIO_WritePin(MOTOR_IN1_GPIO_Port, MOTOR_IN1_Pin, GPIO_PIN_SET);
+//    HAL_GPIO_WritePin(MOTOR_IN2_GPIO_Port, MOTOR_IN2_Pin, GPIO_PIN_RESET);
+//    HAL_GPIO_WritePin(MOTOR_IN3_GPIO_Port, MOTOR_IN3_Pin, GPIO_PIN_SET);
+//    HAL_GPIO_WritePin(MOTOR_IN4_GPIO_Port, MOTOR_IN4_Pin, GPIO_PIN_RESET);
 
     while (1) {
+    	mpu9250_read_gyro();
+    	moveStraightGyroPID();
         int32_t current_left = get_left_encoder_total();
         int32_t current_right = get_right_encoder_total();
         int32_t left_traveled = current_left - start_left;
@@ -400,49 +417,386 @@ void move_forward_with_profile(float distance_mm, float max_speed) {
 }
 
 // PID parameters for encoders
-float Kp_e =0.03; // Proportional term
-float Ki_e = 0; // Integral term
-float Kd_e = 0.1; // Derivative term
-float errorenco = 0;
-float previousErrorenco = 0;
-float integralenco = 0;
-float derivativeenco = 0;
-/*
- * Encoder PID
- * */
-void moveStraightPID(void) {
-	left_total=get_left_encoder_total();
-	left_total=get_left_encoder_total();
-	errorenco = left_total - right_total;
+//float Kp_e =0.02; // Proportional term
+//float Ki_e = 0; // Integral term
+//float Kd_e = 0.1; // Derivative term
+//float error_e = 0;
+//float previousError_e = 0;
+//float integral_e = 0;
+//float derivative_e = 0;
+///*
+// * Encoder PID
+// * */
+//void moveStraightPID(void) {
+//	left_total=get_left_encoder_total();
+//	left_total=get_left_encoder_total();
+//	error_e = left_total - right_total;
+//
+//	integral_e += error_e;
+//	derivative_e = error_e - previousError_e;
+//
+//	float correction = (Kp_e * error_e) + (Ki_e * integral_e) + (Kd_e * derivative_e);
+//
+//	int motor1Speed = 500 + correction;
+//	int motor2Speed = 510 - correction;
+//
+//	if (motor1Speed>1000){
+//	  motor1Speed= 1000;
+//	};
+//	if (motor2Speed>1000){
+//	  motor2Speed= 1000;
+//	};
+//	if (motor1Speed<0){
+//	  motor1Speed= 0;
+//	};
+//	if (motor2Speed<0){
+//	  motor2Speed= 0;
+//	};
+//
+//	motor_set_fixed(0, true, motor2Speed);//Left
+//
+//	motor_set_fixed(1, true, motor1Speed);//Right
+//
+//
+//	previousError_e = error_e;
+//}
 
-	integralenco += errorenco;
-	derivativeenco = errorenco - previousErrorenco;
+/* Tunable gains (start conservative, tune per-bot) */
+static float Kp_e = 0.018f;//0.02f;   // Proportional on rate error (PWM per count/s)
+static float Ki_e = 0.040f;    // Integral on rate error
+static float Kd_e = 0.000f;    // Derivative on rate error
 
-	float correction = (Kp_e * errorenco) + (Ki_e * integralenco) + (Kd_e * derivativeenco);
+/* Internal state */
+static int32_t prev_left_counts = 0;
+static int32_t prev_right_counts = 0;
+static float prev_error_rate = 0.0f;
+static float integral_e = 0.0f;
+static float deriv_filt = 0.0f;
+static uint32_t pid_last_ms = 0;
 
-	int motor1Speed = 500 + correction;
-	int motor2Speed = 510 - correction;
+/* Filters / clamps */
+static const float DERIV_FILTER_ALPHA_E = 0.85f;   // 0..1, larger -> more smoothing
+static const float INTEGRAL_LIMIT_E = 1000.0f;    // clamp integral term (tune)
+static const int PWM_MIN = 0;
+static const int PWM_MAX = 700;
+static const int PWM_MIN_MOVE = 40;                // optional min to overcome stiction
 
-	if (motor1Speed>1000){
-	  motor1Speed= 1000;
-	};
-	if (motor2Speed>1000){
-	  motor2Speed= 1000;
-	};
-	if (motor1Speed<0){
-	  motor1Speed= 0;
-	};
-	if (motor2Speed<0){
-	  motor2Speed= 0;
-	};
-
-	motor_set_fixed(0, true, motor2Speed);//Left
-
-	motor_set_fixed(1, true, motor1Speed);//Right
-
-
-	previousErrorenco = errorenco;
+/* Helper clamp */
+static inline float clampf_local(float v, float lo, float hi) {
+    return (v < lo) ? lo : (v > hi) ? hi : v;
 }
+
+/* Call once immediately before starting a straight movement */
+void moveStraightPID_Reset(void) {
+    prev_left_counts = get_left_encoder_total();
+    prev_right_counts = get_right_encoder_total();
+    prev_error_rate = 0.0f;
+    integral_e = 0.0f;
+    deriv_filt = 0.0f;
+    pid_last_ms = HAL_GetTick();
+}
+
+/*
+ * Call this repeatedly while moving forward.
+ * base_pwm: nominal forward PWM (same idea as your previous base 500).
+ * left_forward/right_forward: booleans for motor_set_fixed() direction
+ *
+ * If your robot uses fixed forward direction everywhere, pass true/true.
+ */
+void moveStraightPID(int base_pwm, bool left_forward, bool right_forward) {
+    uint32_t now = HAL_GetTick();
+    float dt = (now - pid_last_ms) / 1000.0f;
+    if (dt <= 0.0f) dt = 0.001f;   // safety
+    pid_last_ms = now;
+
+    /* Read encoder totals */
+    int32_t left_total = get_left_encoder_total();
+    int32_t right_total = get_right_encoder_total();
+
+    /* Delta counts in this interval */
+    int32_t dleft = left_total - prev_left_counts;
+    int32_t dright = right_total - prev_right_counts;
+
+    /* Save for next iteration */
+    prev_left_counts  = left_total;
+    prev_right_counts = right_total;
+
+    /* Convert to rate (counts per second). Using counts/s is robust and avoids
+       huge integrator values on long runs. If you prefer physical units, convert
+       counts -> mm using your ENCODER_COUNTS_PER_MM constant first. */
+    float left_rate  = (float)dleft / dt;   // counts / s
+    float right_rate = (float)dright / dt;  // counts / s
+
+    /* Error is rate difference: left - right (positive => left faster) */
+    float error_rate = left_rate - right_rate;
+
+    /* Integral on rate error */
+    integral_e += error_rate * dt;
+    integral_e = clampf_local(integral_e, -INTEGRAL_LIMIT_E, INTEGRAL_LIMIT_E);
+
+    /* Derivative (on error rate) with low-pass filtering */
+    float deriv_raw = (error_rate - prev_error_rate) / dt;   // d(error_rate)/dt
+    deriv_filt = DERIV_FILTER_ALPHA_E * deriv_filt + (1.0f - DERIV_FILTER_ALPHA_E) * deriv_raw;
+
+    /* PID output: signed PWM correction (positive -> speed up right wheel OR slow left wheel) */
+    float correction = (Kp_e * error_rate) + (Ki_e * integral_e) + (Kd_e * deriv_filt);
+
+    /* Map correction to motor PWMs: keep same sign mapping as your original code:
+       original: motor1 = base + correction; motor2 = base - correction
+       (motor1 = right wheel, motor2 = left wheel). */
+    int pwm_right = (int)roundf((float)base_pwm + correction);
+    int pwm_left  = (int)roundf((float)base_pwm - correction);
+
+    /* Clamp */
+    pwm_left  = (int)clampf_local((float)pwm_left, (float)PWM_MIN, (float)PWM_MAX);
+    pwm_right = (int)clampf_local((float)pwm_right, (float)PWM_MIN, (float)PWM_MAX);
+
+    /* Optional: enforce minimum non-zero movement so wheel actually turns */
+    if (pwm_left > 0 && pwm_left < PWM_MIN_MOVE) pwm_left = PWM_MIN_MOVE;
+    if (pwm_right > 0 && pwm_right < PWM_MIN_MOVE) pwm_right = PWM_MIN_MOVE;
+
+    /* Apply to motors (Left = index 0 in your mapping, Right = index 1) */
+    motor_set_fixed(0, left_forward,  (uint16_t)pwm_left);   // Left
+    motor_set_fixed(1, right_forward, (uint16_t)pwm_right);  // Right
+
+    /* remember for next loop */
+    prev_error_rate = error_rate;
+}
+
+
+
+
+// PID parameters for gyro
+float Kp_g = 0.8657f;//6.4; // Proportional term
+float Ki_g = 5.3769f;//0; // Integral term
+float Kd_g = 0.0f;//2; // Derivative term
+//float error_g = 0;
+//float previousError_g = 0;
+//float integral_g = 0;
+//float derivative_g = 0;
+/* ----- Internal PID state (file-static) ----- */
+static float pid_error_prev = 0.0f;      // previous error (for derivative)
+static float pid_integral = 0.0f;        // integrated error (with dt)
+static float pid_deriv_filt = 0.0f;      // filtered derivative
+
+
+/* Derivative low-pass filter: alpha in [0..1], bigger => more smoothing */
+static const float DERIV_FILTER_ALPHA = 0.85f;
+
+/* Integral clamp (anti-windup) */
+static const float INTEGRAL_LIMIT = 2000.0f; // tune as needed (units: deg/s * s)
+
+
+
+
+
+/* Call this once immediately before starting a straight movement */
+void moveStraightGyroPID_Reset(void) {
+    pid_error_prev = 0.0f;
+    pid_integral = 0.0f;
+    pid_deriv_filt = 0.0f;
+    pid_last_ms = HAL_GetTick();
+}
+
+void moveStraightGyroPID(void) {
+    uint32_t now = HAL_GetTick();
+    float dt = (now - pid_last_ms) / 1000.0f;
+    if (dt <= 0.0f) dt = 0.001f; // safety small dt if HAL tick didn't advance
+    pid_last_ms = now;
+
+    /* READ: your gyro rate (deg/s). Keep original sign convention:
+       original code used error_g = mpu9250_get_gyro_z_compensated();
+       and motor1 = base - correction; motor2 = base + correction;
+       so we preserve that mapping for compatibility. */
+    float error = mpu9250_get_gyro_z_compensated();
+
+    /* Integral (with dt) + anti-windup clamp */
+    pid_integral += error * dt;
+    pid_integral = clampf_local(pid_integral, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
+
+    /* Derivative (on error) and low-pass filter */
+    float deriv_raw = (error - pid_error_prev) / dt;    // d(error)/dt
+    pid_deriv_filt = DERIV_FILTER_ALPHA * pid_deriv_filt + (1.0f - DERIV_FILTER_ALPHA) * deriv_raw;
+
+    /* PID output (correction) */
+    float correction = (Kp_g * error) + (Ki_g * pid_integral) + (Kd_g * pid_deriv_filt);
+
+    /* Base PWM for forward motion (adjust to your nominal cruising PWM) */
+    const int base_pwm = 700;
+
+    int motor1Speed = (int)roundf((float)base_pwm - correction); // right wheel in your mapping
+    int motor2Speed = (int)roundf((float)base_pwm + correction); // left wheel
+
+    /* Clamp PWM outputs (and provide a safe top, not full 1000 if you prefer) */
+    if (motor1Speed > 800) motor1Speed = 800;
+    if (motor2Speed > 800) motor2Speed = 800;
+    if (motor1Speed < 0) motor1Speed = 0;
+    if (motor2Speed < 0) motor2Speed = 0;
+
+
+
+    /* Set motors: adjust direction flags if your wiring uses opposite logic */
+    motor_set_fixed(0, true, motor2Speed); // Left
+    motor_set_fixed(1, true, motor1Speed); // Right
+
+    /* store previous error for next derivative computation */
+    pid_error_prev = error;
+}
+
+
+
+
+// Measured plant gain (from your CSV): ~1.3828 deg/s per ΔPWM
+#define GYRO_K_DPS_PER_DPWM   1.3828f
+
+// Rate PID gains (start conservative; move up if stable)
+float Kp_t = 0.866955;   //(PWM per deg/s)
+float Ki_t = 5.384815;   //(PWM per deg/s per s)// PWM per deg  (with integral += err*dt)
+float Kd_t =0; // PWM per (deg/s^2)
+
+// Desired-rate shaping
+static float OMEGA_MAX_DPS   = 300.0f;   // cap desired |rate|
+static float ALPHA_MAX_DPS2  = 3000.0f;  // braking accel (deg/s^2)
+
+// Finish criteria
+static float ANGLE_TOL_DEG   = 1.0f;
+static float RATE_TOL_DPS    = 20.0f;
+static uint32_t SETTLE_MS    = 60;
+
+// Small command deadband near stop (don’t twitch)
+static float OMEGA_CMD_DEADBAND = 12.0f;   // deg/s
+
+// Derivative filtering + integral clamp
+static const float DERIV_ALPHA  = 0.90f;   // 0..1
+static const float INTEGRAL_CLAMP = 1000.0f;
+
+// --- PID state ---
+static float pid_int = 0.0f, pid_prev_err = 0.0f, pid_deriv_f = 0.0f;
+
+static inline float signf(float x) { return (x >= 0.0f) ? 1.0f : -1.0f; }
+
+static void gyro_turn_reset(void) {
+    pid_int = 0.0f;
+    pid_prev_err = 0.0f;
+    pid_deriv_f = 0.0f;
+    pid_last_ms = HAL_GetTick();
+}
+
+static float gyro_rate_pid_step(float sp_dps, float meas_dps, float *p_dt) {
+    uint32_t now = HAL_GetTick();
+    float dt = (now - pid_last_ms) / 1000.0f;
+    if (dt <= 0.0f) dt = 0.002f;
+    pid_last_ms = now;
+    if (p_dt) *p_dt = dt;
+
+    float err = sp_dps - meas_dps;
+
+    // integral (anti-windup)
+    pid_int += err * dt;
+    if (pid_int >  INTEGRAL_CLAMP) pid_int =  INTEGRAL_CLAMP;
+    if (pid_int < -INTEGRAL_CLAMP) pid_int = -INTEGRAL_CLAMP;
+
+    // derivative (filtered)
+    float d_raw = (err - pid_prev_err) / dt;
+    pid_deriv_f = DERIV_ALPHA * pid_deriv_f + (1.0f - DERIV_ALPHA) * d_raw;
+    pid_prev_err = err;
+
+    // PID → ΔPWM (right - left)
+    return Kp_g*err + Ki_g*pid_int + Kd_g*pid_deriv_f;
+}
+
+/**
+ * In-place turn by angle (deg). +angle = CCW/left, -angle = CW/right.
+ * base_pwm = 80..250 is typical. timeout_ms is safety.
+ */
+void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms)
+{
+    if (base_pwm < 60)  base_pwm = 60;
+    if (base_pwm > 400) base_pwm = 400;
+
+    gyro_turn_reset();
+
+    float yaw = 0.0f;                  // integrated heading (deg)
+    const float target = angle_deg;    // signed target
+    uint32_t t0 = HAL_GetTick();
+    uint32_t settle_start = 0;
+
+    // last timestamp for yaw integration
+    uint32_t last_ms = HAL_GetTick();
+
+    while (1) {
+        // --- timing ---
+        uint32_t now = HAL_GetTick();
+        float dt = (now - last_ms) / 1000.0f;
+        if (dt <= 0.0f) dt = 0.001f;
+        last_ms = now;
+        mpu9250_read_gyro();
+        // --- sensors ---
+        float gz = mpu9250_get_gyro_z_compensated();  // deg/s
+
+        // --- integrate heading (keep sign!) ---
+        yaw += gz * dt;
+
+        // signed angle error (THIS FIXES THE MAIN BUG)
+        float ang_err = target - yaw;
+
+        // desired rate with braking law (changes sign if you overshoot)
+        float omega_brake = sqrtf(fmaxf(0.0f, 2.0f * ALPHA_MAX_DPS2 * fabsf(ang_err)));
+        float omega_des = clampf_local(omega_brake, 0.0f, OMEGA_MAX_DPS) * signf(ang_err);
+
+        // small deadband on command (avoid micro twitch)
+        if (fabsf(omega_des) < OMEGA_CMD_DEADBAND) omega_des = 0.0f;
+
+        // --- inner rate loop ---
+        float pid_dt = 0.0f;
+        float dPWM_pid = gyro_rate_pid_step(omega_des, gz, &pid_dt);  // ΔPWM from PID
+        float dPWM_ff  = (fabsf(omega_des) > 0.0f) ? (omega_des / GYRO_K_DPS_PER_DPWM) : 0.0f;
+        float dPWM     = dPWM_ff + dPWM_pid;   // total ΔPWM (right - left), signed
+
+        // split ΔPWM around base so both sides get torque
+        float right_mag = (float)base_pwm + 0.5f * fabsf(dPWM);
+        float left_mag  = (float)base_pwm + 0.5f * fabsf(dPWM);
+
+        // decide directions from CURRENT command sign (not the initial turn dir)
+        bool left_forward, right_forward;
+        if (dPWM >= 0.0f) {
+            // turn left: left backward, right forward
+            left_forward  = false;
+            right_forward = true;
+        } else {
+            // turn right: left forward, right backward
+            left_forward  = true;
+            right_forward = false;
+        }
+
+        // if command very small AND rate small, cut power to stop cleanly
+        if (fabsf(ang_err) <= ANGLE_TOL_DEG && fabsf(gz) <= RATE_TOL_DPS) {
+            motor_set_fixed(0, true, 0);
+            motor_set_fixed(1, true, 0);
+            if (settle_start == 0) settle_start = now;
+            if ((now - settle_start) >= SETTLE_MS) break;
+        } else {
+            settle_start = 0;
+
+            // Apply PWM (no fake “min move” offsets here—let control truly go to 0 near stop)
+            int pwmL = (int)roundf(left_mag);
+            int pwmR = (int)roundf(right_mag);
+            if (pwmL < 0) pwmL = 0; if (pwmL > 1000) pwmL = 1000;
+            if (pwmR < 0) pwmR = 0; if (pwmR > 1000) pwmR = 1000;
+
+            motor_set_fixed(0, left_forward,  (uint16_t)pwmL);
+            motor_set_fixed(1, right_forward, (uint16_t)pwmR);
+        }
+
+        if ((now - t0) > timeout_ms) break;
+
+        HAL_Delay(2); // ~500 Hz outer loop
+    }
+
+    stop_motors();
+    HAL_Delay(60);
+}
+
 
 /**
  * @brief Simple smooth movement for one cell
@@ -503,8 +857,8 @@ void test_encoder_rotation(void) {
     for(int i = 0; i < 20; i++) {
         uint16_t left_raw = TIM2->CNT;
         uint16_t right_raw = TIM4->CNT;
-        int32_t left_total = get_left_encoder_total()-31768;
-        int32_t right_total = get_right_encoder_total()+30768;
+        int32_t left_total = get_left_encoder_total();
+        int32_t right_total = get_right_encoder_total();
 
         send_bluetooth_printf("T+%ds: Raw L:%d R:%d | Total L:%ld R:%ld\r\n",
                              i/2, left_raw, right_raw, left_total, right_total);
