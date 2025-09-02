@@ -103,7 +103,6 @@ static void MX_TIM2_Init(void);
 static void MX_TIM4_Init(void);
 static void MX_USART6_UART_Init(void);
 static void MX_TIM3_Init(void);
-
 /* USER CODE BEGIN PFP */
 
 static void initialize_hardware_systems(void);
@@ -273,8 +272,6 @@ int main(void)
   MX_TIM4_Init();
   MX_USART6_UART_Init();
   MX_TIM3_Init();
-
-
   /* USER CODE BEGIN 2 */
   // Initialize all hardware systems
   initialize_hardware_systems();
@@ -489,7 +486,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
+  sConfig.SamplingTime = ADC_SAMPLETIME_56CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
