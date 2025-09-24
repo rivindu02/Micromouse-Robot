@@ -123,6 +123,8 @@ void update_sensors(void)
 						   EMIT_SIDE_LEFT_Pin, EMIT_SIDE_RIGHT_Pin};
 
 	int16_t difference[4];
+	turn_off_emitters();
+
 	for(int i = 0; i < 4; i++) {
 		// Test with emitter OFF
 		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_RESET);
@@ -137,7 +139,13 @@ void update_sensors(void)
 
 
 		// Calculate difference
-		difference[i] = on_reading - off_reading;
+		//difference[i] = on_reading - off_reading;
+
+		// Calculate difference (clamped to >= 0)
+		int32_t d = (int32_t)on_reading - (int32_t)off_reading;
+		if (d < 0) d = 0;
+		difference[i] = (int16_t)d;
+
 
 		// Turn off emitter
 		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_RESET);
@@ -260,20 +268,20 @@ void send_detailed_sensor_status(void)
         update_sensors();
 
         send_bluetooth_message("Current readings vs baselines:\r\n");
-        send_bluetooth_printf("Front Left:  %d (baseline: %d, threshold: %d)\r\n",
-                             sensors.front_left + sensor_cal.ambient_baseline[0],
+        send_bluetooth_printf("Front Left (diff):  %u (ambient: %u, th: %u)\r\n",
+                             sensors.front_left,
                              sensor_cal.ambient_baseline[0],
                              sensor_cal.wall_thresholds[0]);
-        send_bluetooth_printf("Front Right: %d (baseline: %d, threshold: %d)\r\n",
-                             sensors.front_right + sensor_cal.ambient_baseline[1],
+        send_bluetooth_printf("Front Right (diff): %u (ambient: %u, th: %u)\r\n",
+                             sensors.front_right,
                              sensor_cal.ambient_baseline[1],
                              sensor_cal.wall_thresholds[1]);
-        send_bluetooth_printf("Side Left:   %d (baseline: %d, threshold: %d)\r\n",
-                             sensors.side_left + sensor_cal.ambient_baseline[2],
+        send_bluetooth_printf("Side Left (diff): %u (ambient: %u, th: %u)\r\n",
+                             sensors.side_left,
                              sensor_cal.ambient_baseline[2],
                              sensor_cal.wall_thresholds[2]);
-        send_bluetooth_printf("Side Right:  %d (baseline: %d, threshold: %d)\r\n",
-                             sensors.side_right + sensor_cal.ambient_baseline[3],
+        send_bluetooth_printf("Side Right (diff): %u (ambient: %u, th: %u)\r\n",
+                             sensors.side_right,
                              sensor_cal.ambient_baseline[3],
                              sensor_cal.wall_thresholds[3]);
 
@@ -446,93 +454,81 @@ void calibrate_sensors(void)
     send_bluetooth_printf("  Side Left:   %d\r\n", sensor_cal.ambient_baseline[2]);
     send_bluetooth_printf("  Side Right:  %d\r\n", sensor_cal.ambient_baseline[3]);
 
-    // Phase 3: Active Sensor Response Measurement
-    send_bluetooth_message("Phase 3: Measuring sensor response (IR emitters ON)\r\n");
+    // Phase 3: Differential response per sensor (ON-OFF, single emitter only)
+    send_bluetooth_message("Phase 3: Measuring differential response per sensor\r\n");
 
-    // Turn on emitters and measure response
-    turn_on_emitters();
-    HAL_Delay(50); // Emitter stabilization
+    uint16_t diff_avg[4] = {0};
+    float    diff_noise[4] = {0};
 
-    uint32_t active_sum[4] = {0};
-    uint32_t active_readings = 50;
+    uint32_t ch[] = {ADC_CHANNEL_5, ADC_CHANNEL_2, ADC_CHANNEL_4, ADC_CHANNEL_3};
+    GPIO_TypeDef* prt[] = {EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_RIGHT_GPIO_Port,
+                           EMIT_SIDE_LEFT_GPIO_Port,  EMIT_SIDE_RIGHT_GPIO_Port};
+    uint16_t pin[] = {EMIT_FRONT_LEFT_Pin, EMIT_FRONT_RIGHT_Pin,
+                      EMIT_SIDE_LEFT_Pin,  EMIT_SIDE_RIGHT_Pin};
 
-    // Track min/max for noise calculation
-    uint16_t temp_min[4] = {4095, 4095, 4095, 4095};
-    uint16_t temp_max[4] = {0, 0, 0, 0};
+    // make sure all emitters are OFF
+    turn_off_emitters();
 
-    for (int i = 0; i < active_readings; i++) {
-        uint16_t readings[4];
-        readings[0] = read_adc_channel(ADC_CHANNEL_5); // Front Left
-        readings[1] = read_adc_channel(ADC_CHANNEL_2); // Front Right
-        readings[2] = read_adc_channel(ADC_CHANNEL_4); // Side Left
-        readings[3] = read_adc_channel(ADC_CHANNEL_3); // Side Right
+    for (int i=0;i<4;i++){
+        const int K = 20;        // minimal samples for an average
+        uint32_t acc = 0;
+        uint16_t minv = 0xFFFF, maxv = 0;
 
-        for (int j = 0; j < 4; j++) {
-            active_sum[j] += readings[j];
-            if (readings[j] < temp_min[j]) temp_min[j] = readings[j];
-            if (readings[j] > temp_max[j]) temp_max[j] = readings[j];
+        for (int k=0;k<K;k++){
+            // OFF window (emitter off)
+            HAL_GPIO_WritePin(prt[i], pin[i], GPIO_PIN_RESET);
+            uint16_t off = read_adc_channel(ch[i]);
+
+            // ON window (only this emitter on)
+            HAL_GPIO_WritePin(prt[i], pin[i], GPIO_PIN_SET);
+            uint16_t on  = read_adc_channel(ch[i]);
+
+            // back to OFF
+            HAL_GPIO_WritePin(prt[i], pin[i], GPIO_PIN_RESET);
+
+            uint16_t d = (on > off) ? (on - off) : 0;
+            acc += d;
+            if (d < minv) minv = d;
+            if (d > maxv) maxv = d;
+
+            HAL_Delay(2);
         }
-        HAL_Delay(10);
+
+        diff_avg[i]            = (uint16_t)(acc / K);
+        diff_noise[i]          = (float)(maxv - minv);
+        sensor_cal.noise_levels[i] = diff_noise[i];
+        sensor_cal.sensor_min[i]   = minv;
+        sensor_cal.sensor_max[i]   = maxv;
     }
 
-    // Calculate active response levels and noise
-    uint16_t active_avg[4];
-    for (int i = 0; i < 4; i++) {
-        active_avg[i] = active_sum[i] / active_readings;
-        sensor_cal.sensor_min[i] = temp_min[i];
-        sensor_cal.sensor_max[i] = temp_max[i];
-        sensor_cal.noise_levels[i] = (float)(temp_max[i] - temp_min[i]);
+    send_bluetooth_message("Differential response (ON-OFF):\r\n");
+    send_bluetooth_printf("  Front Left:  %u (noise: %.1f)\r\n", diff_avg[0], diff_noise[0]);
+    send_bluetooth_printf("  Front Right: %u (noise: %.1f)\r\n", diff_avg[1], diff_noise[1]);
+    send_bluetooth_printf("  Side Left:   %u (noise: %.1f)\r\n", diff_avg[2], diff_noise[2]);
+    send_bluetooth_printf("  Side Right:  %u (noise: %.1f)\r\n", diff_avg[3], diff_noise[3]);
+
+    // Phase 4: Set DIFFERENTIAL thresholds (same domain as runtime readings)
+    send_bluetooth_message("Phase 4: Calculating differential wall thresholds\r\n");
+
+
+    for (int i=0;i<4;i++){
+        float frac   = (i < 2) ? 0.40f : 0.30f;   // front vs side
+        float margin = 3.0f * sensor_cal.noise_levels[i];
+        float th     = frac * (float)diff_avg[i] + margin;
+
+        if (th < 60.0f)   th = 60.0f;             // reasonable floor
+        if (th > 3500.0f) th = 3500.0f;
+
+        sensor_cal.wall_thresholds[i] = (uint16_t)(th + 0.5f);
     }
 
-    send_bluetooth_message("Active sensor response (emitters ON):\r\n");
-    send_bluetooth_printf("  Front Left:  %d (noise: %.1f)\r\n", active_avg[0], sensor_cal.noise_levels[0]);
-    send_bluetooth_printf("  Front Right: %d (noise: %.1f)\r\n", active_avg[1], sensor_cal.noise_levels[1]);
-    send_bluetooth_printf("  Side Left:   %d (noise: %.1f)\r\n", active_avg[2], sensor_cal.noise_levels[2]);
-    send_bluetooth_printf("  Side Right:  %d (noise: %.1f)\r\n", active_avg[3], sensor_cal.noise_levels[3]);
+    send_bluetooth_message("Differential wall thresholds:\r\n");
+    send_bluetooth_printf("  Front Left:  %u\r\n", sensor_cal.wall_thresholds[0]);
+    send_bluetooth_printf("  Front Right: %u\r\n", sensor_cal.wall_thresholds[1]);
+    send_bluetooth_printf("  Side Left:   %u\r\n", sensor_cal.wall_thresholds[2]);
+    send_bluetooth_printf("  Side Right:  %u\r\n", sensor_cal.wall_thresholds[3]);
 
-    // Phase 4: Dynamic Threshold Calculation
-    send_bluetooth_message("Phase 4: Calculating dynamic wall detection thresholds\r\n");
 
-    // Calculate differential response (active - ambient)
-    uint16_t differential[4];
-    for (int i = 0; i < 4; i++) {
-        if (active_avg[i] > sensor_cal.ambient_baseline[i]) {
-            differential[i] = active_avg[i] - sensor_cal.ambient_baseline[i];
-        } else {
-            differential[i] = 0; // Sensor may be faulty
-        }
-    }
-
-    // Set dynamic thresholds based on differential response and noise
-    // Front sensors (0,1) typically have higher response near walls
-    // Side sensors (2,3) have different response characteristics
-    for (int i = 0; i < 4; i++) {
-        if (i < 2) { // Front sensors
-            // For front sensors, set threshold at 40% of differential + noise margin
-            sensor_cal.wall_thresholds[i] = sensor_cal.ambient_baseline[i] +
-                                          (differential[i] * 0.4f) +
-                                          (sensor_cal.noise_levels[i] * 3.0f);
-        } else { // Side sensors
-            // For side sensors, set threshold at 30% of differential + noise margin
-            sensor_cal.wall_thresholds[i] = sensor_cal.ambient_baseline[i] +
-                                          (differential[i] * 0.3f) +
-                                          (sensor_cal.noise_levels[i] * 3.0f);
-        }
-
-        // Sanity check - ensure threshold is reasonable
-        if (sensor_cal.wall_thresholds[i] < sensor_cal.ambient_baseline[i] + 100) {
-            sensor_cal.wall_thresholds[i] = sensor_cal.ambient_baseline[i] + 100;
-        }
-        if (sensor_cal.wall_thresholds[i] > 3500) { // Don't exceed reasonable ADC range
-            sensor_cal.wall_thresholds[i] = 3500;
-        }
-    }
-
-    send_bluetooth_message("Dynamic wall detection thresholds:\r\n");
-    send_bluetooth_printf("  Front Left:  %d\r\n", sensor_cal.wall_thresholds[0]);
-    send_bluetooth_printf("  Front Right: %d\r\n", sensor_cal.wall_thresholds[1]);
-    send_bluetooth_printf("  Side Left:   %d\r\n", sensor_cal.wall_thresholds[2]);
-    send_bluetooth_printf("  Side Right:  %d\r\n", sensor_cal.wall_thresholds[3]);
 
     // Phase 5: Battery Baseline Measurement
     send_bluetooth_message("Phase 5: Battery voltage baseline measurement\r\n");
@@ -549,43 +545,43 @@ void calibrate_sensors(void)
                          sensor_cal.battery_baseline, battery_voltage);
 
     // Phase 6: Sensor Health Validation
-    send_bluetooth_message("Phase 6: Sensor health validation\r\n");
-
+//    send_bluetooth_message("Phase 6: Sensor health validation\r\n");
+//
     bool all_sensors_healthy = true;
-
-    // Check each sensor
-    const char* sensor_names[4] = {"Front Left", "Front Right", "Side Left", "Side Right"};
-
-    for (int i = 0; i < 4; i++) {
-        bool sensor_healthy = true;
-
-        // Check if sensor shows reasonable differential response
-        if (differential[i] < 50) {
-            send_bluetooth_printf("⚠️ %s: Low differential response (%d)\r\n",
-                                 sensor_names[i], differential[i]);
-            sensor_healthy = false;
-        }
-
-        // Check noise levels
-        if (sensor_cal.noise_levels[i] > 200) {
-            send_bluetooth_printf("⚠️ %s: High noise level (%.1f)\r\n",
-                                 sensor_names[i], sensor_cal.noise_levels[i]);
-            sensor_healthy = false;
-        }
-
-        // Check if readings are within reasonable ADC range
-        if (sensor_cal.ambient_baseline[i] > 3800 || sensor_cal.ambient_baseline[i] < 10) {
-            send_bluetooth_printf("⚠️ %s: Ambient reading out of range (%d)\r\n",
-                                 sensor_names[i], sensor_cal.ambient_baseline[i]);
-            sensor_healthy = false;
-        }
-
-        if (sensor_healthy) {
-            send_bluetooth_printf("✅ %s: Healthy\r\n", sensor_names[i]);
-        } else {
-            all_sensors_healthy = false;
-        }
-    }
+//
+//    // Check each sensor
+//    const char* sensor_names[4] = {"Front Left", "Front Right", "Side Left", "Side Right"};
+//
+//    for (int i = 0; i < 4; i++) {
+//        bool sensor_healthy = true;
+//
+//        // Check if sensor shows reasonable differential response
+//        if (differential[i] < 50) {
+//            send_bluetooth_printf("⚠️ %s: Low differential response (%d)\r\n",
+//                                 sensor_names[i], differential[i]);
+//            sensor_healthy = false;
+//        }
+//
+//        // Check noise levels
+//        if (sensor_cal.noise_levels[i] > 200) {
+//            send_bluetooth_printf("⚠️ %s: High noise level (%.1f)\r\n",
+//                                 sensor_names[i], sensor_cal.noise_levels[i]);
+//            sensor_healthy = false;
+//        }
+//
+//        // Check if readings are within reasonable ADC range
+//        if (sensor_cal.ambient_baseline[i] > 3800 || sensor_cal.ambient_baseline[i] < 10) {
+//            send_bluetooth_printf("⚠️ %s: Ambient reading out of range (%d)\r\n",
+//                                 sensor_names[i], sensor_cal.ambient_baseline[i]);
+//            sensor_healthy = false;
+//        }
+//
+//        if (sensor_healthy) {
+//            send_bluetooth_printf("✅ %s: Healthy\r\n", sensor_names[i]);
+//        } else {
+//            all_sensors_healthy = false;
+//        }
+//    }
 
     // Check battery
     if (battery_voltage < 3.0f) {
