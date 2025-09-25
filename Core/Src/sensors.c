@@ -13,6 +13,16 @@
 
 #include "micromouse.h"
 
+// sensors.c
+#define EMITTER_ACTIVE_LOW  0   // set to 1 if your drivers are active-low
+
+#if EMITTER_ACTIVE_LOW
+  #define EMIT_ON(port,pin)   HAL_GPIO_WritePin((port),(pin),GPIO_PIN_RESET)
+  #define EMIT_OFF(port,pin)  HAL_GPIO_WritePin((port),(pin),GPIO_PIN_SET)
+#else
+  #define EMIT_ON(port,pin)   HAL_GPIO_WritePin((port),(pin),GPIO_PIN_SET)
+  #define EMIT_OFF(port,pin)  HAL_GPIO_WritePin((port),(pin),GPIO_PIN_RESET)
+#endif
 
 
 
@@ -37,7 +47,7 @@ void turn_on_emitters(void)
     HAL_GPIO_WritePin(EMIT_SIDE_LEFT_GPIO_Port, EMIT_SIDE_LEFT_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(EMIT_SIDE_RIGHT_GPIO_Port, EMIT_SIDE_RIGHT_Pin, GPIO_PIN_SET);
     HAL_GPIO_WritePin(EMIT_FRONT_RIGHT_GPIO_Port, EMIT_FRONT_RIGHT_Pin, GPIO_PIN_SET);
-    HAL_Delay(2); // Emitter stabilization time
+    dwt_delay_us(200); // small settle (µs), not HAL_Delay(ms); // Emitter stabilization time
 }
 
 /**
@@ -55,47 +65,126 @@ void turn_off_emitters(void)
  * @brief Read specific ADC channel using main.c multi-channel setup
  */
 uint16_t read_adc_channel(uint32_t channel) {
-    ADC_ChannelConfTypeDef sConfig = {0};
-    uint16_t adc_value = 0;
+    ADC_ChannelConfTypeDef cfg = {0};
+    cfg.Channel = channel;
+    cfg.Rank = 1;
+    cfg.SamplingTime = ADC_SAMPLETIME_480CYCLES; // more stable than 84
 
-    // Configure the channel
-    sConfig.Channel = channel;
-    sConfig.Rank = 1;
-    sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES; // Longer sampling time
+    if (HAL_ADC_ConfigChannel(&hadc1, &cfg) != HAL_OK) return 0;
 
-    if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK) {
-        send_bluetooth_message("❌ ADC channel config failed\r\n");
-        return 0;
-    }
+    dwt_delay_us(5);                     // tiny mux settle
 
-    // Start ADC conversion
-    if (HAL_ADC_Start(&hadc1) != HAL_OK) {
-        send_bluetooth_message("❌ ADC start failed\r\n");
-        return 0;
-    }
-
-    // Wait for conversion with longer timeout
-    if (HAL_ADC_PollForConversion(&hadc1, 100) != HAL_OK) {
-        send_bluetooth_message("❌ ADC conversion timeout\r\n");
-        HAL_ADC_Stop(&hadc1);
-        return 0;
-    }
-
-    // Get the converted value
-    adc_value = HAL_ADC_GetValue(&hadc1);
-
-    // Stop ADC
+    // dummy conversion (discard)
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, 10);
+    (void)HAL_ADC_GetValue(&hadc1);
     HAL_ADC_Stop(&hadc1);
 
-    return adc_value;
+    // real conversion
+    HAL_ADC_Start(&hadc1);
+    HAL_ADC_PollForConversion(&hadc1, 10);
+    uint16_t v = HAL_ADC_GetValue(&hadc1);
+    HAL_ADC_Stop(&hadc1);
+    return v;
 }
+
+
+// ===== sensors_sync.c additions =====
+// Deterministic microsecond delay using DWT (Cortex-M3/M4/M7).
+// Call dwt_delay_init() once at startup (e.g., in main()).
+
+// sensors.c
+#include "core_cm4.h"  // F411 = Cortex-M4
+
+static uint32_t dwt_cycles_per_us;
+
+void dwt_delay_init(uint32_t cpu_hz) {
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+    dwt_cycles_per_us = cpu_hz / 1000000U; // e.g., 84 for 84 MHz
+}
+
+inline void dwt_delay_us(uint32_t us) {
+    uint32_t start = DWT->CYCCNT;
+    uint32_t ticks = us * dwt_cycles_per_us;
+    while ((DWT->CYCCNT - start) < ticks) { __NOP(); }
+}
+
+
+// ---- Tunables (typical values from micromouse practice) ----
+#define IR_CYCLES   12     // average of 12 ON/OFF pairs per sensor
+#define T_OFF_US    50     // wait after LED OFF before sample
+#define T_ON_US     60     // wait after LED ON before sample
+
+static inline uint16_t diff_once(GPIO_TypeDef* port, uint16_t pin, uint32_t ch) {
+    // OFF sample
+    EMIT_OFF(port, pin);
+    dwt_delay_us(T_OFF_US);
+    uint16_t offv = read_adc_channel(ch);
+
+    // ON sample
+    EMIT_ON(port, pin);
+    dwt_delay_us(T_ON_US);
+    uint16_t onv  = read_adc_channel(ch);
+
+    EMIT_OFF(port, pin);
+
+    int32_t d = (int32_t)onv - (int32_t)offv;
+    return (d > 0) ? (uint16_t)d : 0;
+}
+
+static uint16_t measure_sync(GPIO_TypeDef* port, uint16_t pin, uint32_t ch) {
+    uint32_t acc = 0;
+    for (int k = 0; k < IR_CYCLES; k++) {
+        acc += diff_once(port, pin, ch);
+        dwt_delay_us(20);
+    }
+    if (acc > 4095) acc = 4095;   // clamp to 12-bit domain if you prefer
+    return (uint16_t)acc;
+}
+
+
+void update_sensors(void)
+{
+    uint32_t ch[4]    = {ADC_CHANNEL_5, ADC_CHANNEL_2, ADC_CHANNEL_4, ADC_CHANNEL_3};
+    GPIO_TypeDef* p[4]= {EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_RIGHT_GPIO_Port,
+                         EMIT_SIDE_LEFT_GPIO_Port,  EMIT_SIDE_RIGHT_GPIO_Port};
+    uint16_t pin[4]   = {EMIT_FRONT_LEFT_Pin, EMIT_FRONT_RIGHT_Pin,
+                         EMIT_SIDE_LEFT_Pin,  EMIT_SIDE_RIGHT_Pin};
+
+    // synchronous, ambient-rejected readings
+    uint16_t fl = measure_sync(p[0], pin[0], ch[0]);
+    uint16_t fr = measure_sync(p[1], pin[1], ch[1]);
+    uint16_t sl = measure_sync(p[2], pin[2], ch[2]);
+    uint16_t sr = measure_sync(p[3], pin[3], ch[3]);
+
+    sensors.front_left  = fl;
+    sensors.front_right = fr;
+    sensors.side_left   = sl;
+    sensors.side_right  = sr;
+
+    // battery (light average)
+    uint32_t bat=0; for (int i=0;i<8;i++) bat += read_adc_channel(ADC_CHANNEL_0);
+    sensors.battery = (uint16_t)(bat/8);
+
+    // thresholds (use your calibrated ones if valid)
+    uint16_t th_fl = is_sensor_calibration_valid() ? get_calibrated_threshold(0) : WALL_THRESHOLD_FRONT;
+    uint16_t th_fr = is_sensor_calibration_valid() ? get_calibrated_threshold(1) : WALL_THRESHOLD_FRONT;
+    uint16_t th_sl = is_sensor_calibration_valid() ? get_calibrated_threshold(2) : WALL_THRESHOLD_SIDE;
+    uint16_t th_sr = is_sensor_calibration_valid() ? get_calibrated_threshold(3) : WALL_THRESHOLD_SIDE;
+
+    sensors.wall_front = (fl > th_fl) || (fr > th_fr);
+    sensors.wall_left  = (sl > th_sl);
+    sensors.wall_right = (sr > th_sr);
+}
+
 
 
 
 /**
  * @brief Enhanced update_sensors with calibrated thresholds
  */
-void update_sensors(void)
+void update_sensors2(void)
 {
 //    // Read ambient light levels (emitters off)
 //    turn_off_emitters();
@@ -123,6 +212,9 @@ void update_sensors(void)
 						   EMIT_SIDE_LEFT_Pin, EMIT_SIDE_RIGHT_Pin};
 
 	int16_t difference[4];
+
+
+
 	turn_off_emitters();
 
 	for(int i = 0; i < 4; i++) {
@@ -135,7 +227,6 @@ void update_sensors(void)
 		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_SET);
 		HAL_Delay(2);	//10
 		uint16_t on_reading = read_adc_channel(channels[i]);
-
 
 
 		// Calculate difference

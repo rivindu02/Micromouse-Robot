@@ -108,6 +108,7 @@ static void MX_TIM3_Init(void);
 static void initialize_hardware_systems(void);
 static void run_system_diagnostics(void);
 static void send_periodic_status(void);
+extern void dwt_delay_init(uint32_t cpu_hz);
 
 /* USER CODE END PFP */
 
@@ -272,6 +273,14 @@ int main(void)
   MX_TIM4_Init();
   MX_USART6_UART_Init();
   MX_TIM3_Init();
+
+
+  // main.c — after SystemClock_Config();
+
+
+  dwt_delay_init(HAL_RCC_GetHCLKFreq());
+
+
   /* USER CODE BEGIN 2 */
   // Initialize all hardware systems
   initialize_hardware_systems();
@@ -324,8 +333,12 @@ int main(void)
   // get ADC Values//////////////////////////////////////////////////////
   calibrate_sensors();
   while(1){
-	  //update_sensors();
-	  diagnostic_sensor_test();
+	  update_sensors();
+	  send_bluetooth_printf("FL:%u FR:%u SL:%u SR:%u | Batt:%u\r\n",
+	                          sensors.front_left, sensors.front_right,
+	                          sensors.side_left, sensors.side_right,
+	                          sensors.battery);
+
 	  HAL_Delay(500);
   }
 
