@@ -175,17 +175,18 @@ void motor_set(uint8_t motor, bool forward, uint16_t duty) {
     if (motor == 0) { // Left motor
         if (forward) {
 			// Left reverse: IN1=LOW, IN2=PWM
-        	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, duty); // PA7 = PWM
-        	HAL_GPIO_WritePin(MOTOR_IN1_GPIO_Port, MOTOR_IN1_Pin, GPIO_PIN_RESET); // PA6 = LOW
-
-        } else {
-        	// Left forward: IN1=PWM, IN2=LOW
 			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty); // PA6 = PWM
 			__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0); // PA7 = LOW
 
+        } else {
+        	// Left forward: IN1=PWM, IN2=LOW
+
+        	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, duty); // PA7 = PWM
+        	HAL_GPIO_WritePin(MOTOR_IN1_GPIO_Port, MOTOR_IN1_Pin, GPIO_PIN_RESET); // PA6 = LOW
+
         }
     } else { // Right motor
-    	bool actual_forward = !forward;  // invert direction
+    	bool actual_forward = forward;  // invert direction
         if (actual_forward) {
             // Right reverse: IN3=LOW, IN4=PWM
         	__HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, duty); // PB1 = PWM
@@ -397,7 +398,7 @@ static float pid_deriv_filt = 0.0f;      // filtered derivative
 static const float DERIV_FILTER_ALPHA = 0.85f;
 
 /* Integral clamp (anti-windup) */
-static const float INTEGRAL_LIMIT = 2000.0f; // tune as needed (units: deg/s * s)
+static const float INTEGRAL_LIMIT = 20.0f; // tune as needed (units: deg/s * s)
 
 
 
@@ -441,8 +442,8 @@ void moveStraightGyroPID(void) {
     int motor2Speed = (int)roundf((float)base_pwm + correction); // left wheel
 
     /* Clamp PWM outputs (and provide a safe top, not full 1000 if you prefer) */
-    if (motor1Speed > 800) motor1Speed = 800;
-    if (motor2Speed > 800) motor2Speed = 800;
+    if (motor1Speed > 1200) motor1Speed = 1200;
+    if (motor2Speed > 1200) motor2Speed = 1200;
     if (motor1Speed < 0) motor1Speed = 0;
     if (motor2Speed < 0) motor2Speed = 0;
 

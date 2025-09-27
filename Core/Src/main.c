@@ -286,7 +286,7 @@ int main(void)
   initialize_hardware_systems();
 
   // Run system diagnostics
-  run_system_diagnostics();
+  //run_system_diagnostics();
 
   // Play startup sequence
   play_startup_tone();
@@ -323,6 +323,7 @@ int main(void)
 //  break_motors();
 
 
+
 //  debug_encoder_setup();
 //  test_encoder_manual();
 //  test_encoder_rotation();
@@ -331,13 +332,9 @@ int main(void)
   /* Initialize movement system */
 
   // get ADC Values//////////////////////////////////////////////////////
-  calibrate_sensors();
+  //calibrate_sensors();
   while(1){
 	  update_sensors();
-	  send_bluetooth_printf("FL:%u FR:%u SL:%u SR:%u | Batt:%u\r\n",
-	                          sensors.front_left, sensors.front_right,
-	                          sensors.side_left, sensors.side_right,
-	                          sensors.battery);
 
 	  HAL_Delay(500);
   }

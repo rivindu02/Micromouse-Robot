@@ -35,8 +35,8 @@
 #define ENCODER_COUNTS_PER_TURN 500
 
 /* Sensor thresholds */
-#define WALL_THRESHOLD_FRONT 2000
-#define WALL_THRESHOLD_SIDE 1500
+#define WALL_THRESHOLD_FRONT 10   //2000
+#define WALL_THRESHOLD_SIDE 4      //1500
 #define BATTERY_LOW_THRESHOLD 3000
 #define IR_AMBIENT_THRESHOLD 500
 
@@ -162,6 +162,22 @@ void update_walls(void);
 uint16_t read_adc_channel(uint32_t channel);
 bool are_sensors_healthy(void);
 void adc_system_diagnostics(void);
+
+static uint32_t dwt_cycles_per_us;
+static inline void dwt_delay_us(uint32_t us);
+void dwt_delay_init(uint32_t cpu_hz);
+
+extern int point;
+
+extern uint32_t FL_buff[5];
+extern uint32_t FR_buff[5];
+extern uint32_t L_buff[5];
+extern uint32_t R_buff[5];
+
+#define NOMINAL 1000L
+
+
+
 
 uint16_t get_calibrated_threshold(int sensor_index);
 bool is_sensor_calibration_valid(void);

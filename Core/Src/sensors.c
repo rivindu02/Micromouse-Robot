@@ -12,6 +12,7 @@
  */
 
 #include "micromouse.h"
+#include "core_cm4.h"  // F411 = Cortex-M4
 
 // sensors.c
 #define EMITTER_ACTIVE_LOW  0   // set to 1 if your drivers are active-low
@@ -23,6 +24,22 @@
   #define EMIT_ON(port,pin)   HAL_GPIO_WritePin((port),(pin),GPIO_PIN_SET)
   #define EMIT_OFF(port,pin)  HAL_GPIO_WritePin((port),(pin),GPIO_PIN_RESET)
 #endif
+
+// Calibration values are the raw reading from the sensor
+// NOTE: side sensors see the front wall when the mouse is centered
+#define LD_CAL 624
+#define RD_CAL 635
+// NOTE: front sensor calibration is with the mouse against the rear wall
+#define LF_CAL 602
+#define RF_CAL 622
+
+// values that the sensors get normalised to when the mouse is correctly positioned
+// defined as longs to prevent overflow when normalising
+#define LD_NOMINAL 100L
+#define RD_NOMINAL 100L
+#define LF_NOMINAL 100L
+#define RF_NOMINAL 100L
+
 
 
 
@@ -94,7 +111,7 @@ uint16_t read_adc_channel(uint32_t channel) {
 // Call dwt_delay_init() once at startup (e.g., in main()).
 
 // sensors.c
-#include "core_cm4.h"  // F411 = Cortex-M4
+
 
 static uint32_t dwt_cycles_per_us;
 
@@ -104,7 +121,7 @@ void dwt_delay_init(uint32_t cpu_hz) {
     dwt_cycles_per_us = cpu_hz / 1000000U; // e.g., 84 for 84 MHz
 }
 
-inline void dwt_delay_us(uint32_t us) {
+static inline void dwt_delay_us(uint32_t us) {
     uint32_t start = DWT->CYCCNT;
     uint32_t ticks = us * dwt_cycles_per_us;
     while ((DWT->CYCCNT - start) < ticks) { __NOP(); }
@@ -112,9 +129,9 @@ inline void dwt_delay_us(uint32_t us) {
 
 
 // ---- Tunables (typical values from micromouse practice) ----
-#define IR_CYCLES   12     // average of 12 ON/OFF pairs per sensor
-#define T_OFF_US    50     // wait after LED OFF before sample
-#define T_ON_US     60     // wait after LED ON before sample
+#define IR_CYCLES   32     // average of 12 ON/OFF pairs per sensor
+#define T_OFF_US    80     // wait after LED OFF before sample
+#define T_ON_US     120     // wait after LED ON before sample
 
 static inline uint16_t diff_once(GPIO_TypeDef* port, uint16_t pin, uint32_t ch) {
     // OFF sample
@@ -143,8 +160,134 @@ static uint16_t measure_sync(GPIO_TypeDef* port, uint16_t pin, uint32_t ch) {
     return (uint16_t)acc;
 }
 
+int point=0;
 
-void update_sensors(void)
+uint32_t FL_buff[5];
+uint32_t FR_buff[5];
+uint32_t L_buff[5];
+uint32_t R_buff[5];
+
+void update_sensors(void){
+	turn_off_emitters();
+	//dwt_delay_us(500);
+	uint16_t off_FL = read_adc_channel(ADC_CHANNEL_5);
+	uint16_t off_FR = read_adc_channel(ADC_CHANNEL_2);
+	uint16_t off_L = read_adc_channel(ADC_CHANNEL_4);
+	uint16_t off_R = read_adc_channel(ADC_CHANNEL_3);
+
+	EMIT_ON(EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_LEFT_Pin);
+	EMIT_ON(EMIT_FRONT_RIGHT_GPIO_Port, EMIT_FRONT_RIGHT_Pin);
+	dwt_delay_us(500);
+	//HAL_Delay(1);
+
+	uint16_t on_FL = read_adc_channel(ADC_CHANNEL_5);
+	uint16_t on_FR = read_adc_channel(ADC_CHANNEL_2);
+
+	turn_off_emitters();
+	EMIT_ON(EMIT_SIDE_LEFT_GPIO_Port, EMIT_SIDE_LEFT_Pin);
+	EMIT_ON(EMIT_SIDE_RIGHT_GPIO_Port, EMIT_SIDE_RIGHT_Pin);
+	dwt_delay_us(800);
+	//HAL_Delay(1);
+
+	uint16_t on_L = read_adc_channel(ADC_CHANNEL_4);
+	uint16_t on_R = read_adc_channel(ADC_CHANNEL_3);
+
+	turn_off_emitters();
+
+	uint32_t diff_FL;
+	uint32_t diff_FR;
+	uint32_t diff_L;
+	uint32_t diff_R;
+
+	if (on_FL>off_FL){
+		diff_FL = (uint32_t)on_FL-(uint32_t)off_FL;
+	}else{
+		diff_FL =0;
+	}
+	if (on_FR>off_FR){
+		diff_FR = (uint32_t)on_FR-(uint32_t)off_FR;
+	}else{
+		diff_FR =0;
+	}
+	if (on_L>off_L){
+		diff_L = (uint32_t)on_L-(uint32_t)off_L;
+	}else{
+		diff_L=0;
+	}
+	if (on_R>off_R){
+		diff_R = (uint32_t)on_R-(uint32_t)off_R;
+	}else{
+		diff_R = 0;
+	}
+
+	if (point>=5) point=0;
+
+
+
+	diff_FL=(diff_FL*NOMINAL)/1000;
+	diff_FR=(diff_FR*NOMINAL)/1000;
+	diff_L=(diff_L*NOMINAL)/1000;
+	diff_R=(diff_R*NOMINAL)/1000;
+
+
+
+
+	FL_buff[point]=diff_FL;
+	FR_buff[point]=diff_FR;
+	L_buff[point]=diff_L;
+	R_buff[point]=diff_R;
+
+	point++;
+
+	uint32_t tot_diff_FL=0;
+	uint32_t tot_diff_FR=0;
+	uint32_t tot_diff_L=0;
+	uint32_t tot_diff_R=0;
+
+	for (int i=0;i<5;i++){
+		tot_diff_FL+=FL_buff[i];
+		tot_diff_FR+=FR_buff[i];
+		tot_diff_L+=L_buff[i];
+		tot_diff_R+=R_buff[i];
+	}
+
+    sensors.front_left  = tot_diff_FL/5; //diff_FL; //
+    sensors.front_right = tot_diff_FR/5; //diff_FR; //
+    sensors.side_left   = tot_diff_L/5;  //diff_L; //
+    sensors.side_right  = tot_diff_R/5;  //diff_R; //
+    sensors.battery = read_adc_channel(ADC_CHANNEL_0);
+
+    // Process wall detection using calibrated thresholds
+    if (sensor_cal.calibration_valid) {
+        // Use dynamic thresholds
+        sensors.wall_front = (sensors.front_left > get_calibrated_threshold(0)) ||
+                            (sensors.front_right > get_calibrated_threshold(1));
+        sensors.wall_left = (sensors.side_left > get_calibrated_threshold(2));
+        sensors.wall_right = (sensors.side_right > get_calibrated_threshold(3));
+    } else {
+        // Fallback to static thresholds
+        sensors.wall_front = (sensors.front_left > WALL_THRESHOLD_FRONT) ||
+                            (sensors.front_right > WALL_THRESHOLD_FRONT);
+        sensors.wall_left = (sensors.side_left > WALL_THRESHOLD_SIDE);
+        sensors.wall_right = (sensors.side_right > WALL_THRESHOLD_SIDE);
+    }
+
+
+//	send_bluetooth_printf("FL:%u - %u  FR:%u - %u  SL:%u - %u  SR:%u - %u \r\n",
+//	                          on_FL, off_FL, on_FR,off_FR,
+//	                          on_L, off_L,on_R, off_R);
+
+
+	send_bluetooth_printf("FL:%u   FR:%u  Fwall: %d SL:%u Lwall: %d  SR:%u  Rwall: %d  \r\n",
+		                          sensors.front_left, sensors.front_right,sensors.wall_front,
+		                          sensors.side_left, sensors.wall_left, sensors.side_right, sensors.wall_right);
+
+}
+
+
+
+
+void update_sensors3(void)
 {
     uint32_t ch[4]    = {ADC_CHANNEL_5, ADC_CHANNEL_2, ADC_CHANNEL_4, ADC_CHANNEL_3};
     GPIO_TypeDef* p[4]= {EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_RIGHT_GPIO_Port,
@@ -176,6 +319,11 @@ void update_sensors(void)
     sensors.wall_front = (fl > th_fl) || (fr > th_fr);
     sensors.wall_left  = (sl > th_sl);
     sensors.wall_right = (sr > th_sr);
+
+	send_bluetooth_printf("FL:%u   FR:%u   SL:%u   SR:%u    \r\n",
+		                          sensors.front_left, sensors.front_right,
+		                          sensors.side_left, sensors.side_right);
+
 }
 
 
