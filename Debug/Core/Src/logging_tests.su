@@ -1,5 +1,8 @@
-../Core/Src/logging_tests.c:25:13:log_printf	272	static
-../Core/Src/logging_tests.c:46:14:clampf	24	static
-../Core/Src/logging_tests.c:55:6:run_gyro_step_test	136	static
-../Core/Src/logging_tests.c:123:6:run_encoder_step_test	112	static
-../Core/Src/logging_tests.c:184:6:run_gyro_turn_step_test	80	static
+../Core/Src/logging_tests.c:26:13:log_printf	272	static
+../Core/Src/logging_tests.c:47:14:clampf	24	static
+../Core/Src/logging_tests.c:52:19:clampi	24	static
+../Core/Src/logging_tests.c:60:6:run_gyro_step_test	136	static
+../Core/Src/logging_tests.c:128:6:run_encoder_step_test	112	static
+../Core/Src/logging_tests.c:189:6:run_gyro_turn_step_test	80	static
+../Core/Src/logging_tests.c:235:6:run_wall_lateral_step_test	136	static
+../Core/Src/logging_tests.c:297:6:run_wall_single_left_step_test	152	static

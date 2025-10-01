@@ -75,20 +75,21 @@ EncoderData encoders;
 volatile uint8_t button_pressed = 0;
 volatile uint8_t start_flag = 0;
 
-/* Championship path analysis variables */
-int exploration_steps = 0;
-int theoretical_minimum = 0;
 
-/* Direction vectors for movement - DEFINITIONS */
+/* Direction vectors for movement */
 const int dx[4] = {0, 1, 0, -1}; // N, E, S, W
 const int dy[4] = {1, 0, -1, 0};
 
-/* Goal positions (center of maze) - DEFINITIONS */
-//const int goal_x1 = 7, goal_y1 = 7;
-//const int goal_x2 = 8, goal_y2 = 8;
+/* Goal positions (center of maze)  */
 
 const int goal_x1 = (MAZE_SIZE/2 - 1), goal_y1 = (MAZE_SIZE/2 - 1);
 const int goal_x2 = (MAZE_SIZE/2), goal_y2 = (MAZE_SIZE/2);
+
+/* Exploration state variables */
+static bool system_ready = false;
+static bool exploration_started = false;
+static uint32_t last_status_time = 0;
+static uint32_t last_blink_time = 0;
 
 /* USER CODE END PV */
 
@@ -104,10 +105,135 @@ static void MX_USART6_UART_Init(void);
 static void MX_TIM3_Init(void);
 /* USER CODE BEGIN PFP */
 
+static void initialize_hardware_systems(void);
+static void run_system_diagnostics(void);
+static void send_periodic_status(void);
+extern void dwt_delay_init(uint32_t cpu_hz);
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
+/**
+ * @brief Initialize all hardware systems and perform diagnostics
+ */
+static void initialize_hardware_systems(void) {
+    //send_bluetooth_message("\r\n" "="*60 "\r\n");
+    send_bluetooth_message("🤖 CHAMPIONSHIP MICROMOUSE INITIALIZATION 🤖\r\n");
+    //send_bluetooth_message("="*60 "\r\n");
+
+    // Initialize PWM for motors
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1); // PA6 (MOTOR_IN1)
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2); // PA7 (MOTOR_IN2)
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3); // PB0 (MOTOR_IN3)
+    HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4); // PB1 (MOTOR_IN4)
+    HAL_GPIO_WritePin(MOTOR_STBY_GPIO_Port, MOTOR_STBY_Pin, GPIO_PIN_SET); // Enable DRV8833
+
+    // Verify ADC GPIO configuration
+    verify_adc_gpio_configuration();
+    adc_system_diagnostics();
+
+    // Initialize and test MPU9250 gyroscope
+    if (mpu9250_init()) {
+        send_bluetooth_message("✅ MPU9250 gyroscope initialized successfully\r\n");
+        send_bluetooth_message("⚠️ KEEP ROBOT STATIONARY during gyro calibration!\r\n");
+        HAL_Delay(2000);
+        mpu9250_calibrate_bias();
+        send_bluetooth_message("✅ Gyro calibration complete\r\n");
+    } else {
+        send_bluetooth_message("⚠️ Gyro initialization failed - using basic movement\r\n");
+    }
+
+    // Initialize encoders
+    start_encoders();
+    HAL_Delay(100);
+
+    // Test encoder functionality
+    if (get_left_encoder_total() == 0 && get_right_encoder_total() == 0) {
+        send_bluetooth_message("⚠️ WARNING: Encoders may not be working properly\r\n");
+    } else {
+        send_bluetooth_message("✅ Encoders initialized and responding\r\n");
+    }
+
+    // Initialize maze exploration system
+    initialize_maze_exploration();
+
+    send_bluetooth_message("✅ All systems initialized successfully!\r\n");
+}
+
+/**
+ * @brief Run comprehensive system diagnostics
+ */
+static void run_system_diagnostics(void) {
+    send_bluetooth_message("\r\n🔧 SYSTEM DIAGNOSTICS 🔧\r\n");
+
+    // Test sensors
+    update_sensors();
+    if (sensors.battery == 0 && sensors.front_left == 0 &&
+        sensors.front_right == 0 && sensors.side_left == 0 && sensors.side_right == 0) {
+        send_bluetooth_message("❌ CRITICAL: All sensors reading zero - check connections!\r\n");
+    } else {
+        send_bluetooth_message("✅ Sensors responding normally\r\n");
+        send_sensor_data();
+    }
+
+    // Test battery
+    send_battery_status();
+
+    // Test gyro if available
+    if (mpu9250_is_initialized()) {
+        mpu9250_send_status();
+    }
+
+    // Test encoders
+    send_encoder_status();
+
+    // System health check
+    if (system_health_check()) {
+        send_bluetooth_message("✅ System health check PASSED\r\n");
+        system_ready = true;
+    } else {
+        send_bluetooth_message("⚠️ System health check FAILED - check warnings above\r\n");
+        system_ready = false;
+    }
+
+    send_bluetooth_message("🔧 Diagnostics complete!\r\n");
+}
+
+
+/**
+ * @brief Send periodic status updates
+ */
+static void send_periodic_status(void) {
+    uint32_t current_time = HAL_GetTick();
+
+    // Send status every 10 seconds when not exploring
+    if (current_time - last_status_time > 10000 && !exploration_started) {
+        send_battery_status();
+
+        if (system_ready) {
+            send_bluetooth_message("💚 System ready - Press LEFT button to start exploration\r\n");
+        } else {
+            send_bluetooth_message("🔴 System not ready - Check diagnostics\r\n");
+        }
+
+        last_status_time = current_time;
+    }
+
+    // Blink LED to show system is alive
+    if (current_time - last_blink_time > 2000) {
+        if (system_ready) {
+            HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin);
+        } else {
+            // Fast blink if system not ready
+            HAL_GPIO_TogglePin(LED_RIGHT_GPIO_Port, LED_RIGHT_Pin);
+        }
+        last_blink_time = current_time;
+    }
+}
+
+
 
 /* USER CODE END 0 */
 
@@ -149,68 +275,49 @@ int main(void)
   MX_TIM3_Init();
 
 
+  // main.c — after SystemClock_Config();
+
+
+  dwt_delay_init(HAL_RCC_GetHCLKFreq());
+
+
   /* USER CODE BEGIN 2 */
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_1);   // PA6  (MOTOR_IN1)
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_2);   // PA7  (MOTOR_IN2)
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_3);   // PB0  (MOTOR_IN3)
-  HAL_TIM_PWM_Start(&htim3, TIM_CHANNEL_4);   // PB1  (MOTOR_IN4)
-  HAL_GPIO_WritePin(MOTOR_STBY_GPIO_Port, MOTOR_STBY_Pin, GPIO_PIN_SET); // wake DRV8833
+  // Initialize all hardware systems
+  initialize_hardware_systems();
 
-  /* Initialize micromouse system */
-  championship_micromouse_init();
-  verify_adc_gpio_configuration(); // Missed configurations for adc
-  adc_system_diagnostics();	// verify adc system settings and check ADC channels individually
+  // Run system diagnostics
+  //run_system_diagnostics();
 
+  // Play startup sequence
+  play_startup_tone();
+  led_sequence_startup();
 
-  // Check gyro initialization
-  if (mpu9250_is_initialized()) {
-	  send_bluetooth_message("Calibrating gyro for heading control...\r\n");
-	  send_bluetooth_message("⚠️ KEEP ROBOT STATIONARY during calibration!\r\n");
-	  HAL_Delay(2000);  // Give user time to see message
-	  // bias shud run before getting any gyro values////////////////////////////////////////////
-	  mpu9250_calibrate_bias();
-	  send_bluetooth_message("✅ Gyro calibration complete\r\n");
+  // Send startup message
+  send_bluetooth_message("\r\n🎮 MICROMOUSE CONTROL READY 🎮\r\n");
+  send_bluetooth_message("LEFT button: Start exploration\r\n");
+  send_bluetooth_message("RIGHT button: Status/Emergency stop\r\n");
+  send_bluetooth_message("Waiting for user input...\r\n");
 
-	  // Set initial conservative PID gains
-	  set_heading_pid_gains(1.0f, 0.0f, 0.1f); /// used for scurved PID
-//	  while(1){
-//		  mpu9250_read_all();
-//		  mpu9250_get_gyro_z_dps();// get the raw reading from gyro
-//		  mpu9250_send_status();
-//		  HAL_Delay(500);
-//
-//	  }
+    // Initial status
+  last_status_time = HAL_GetTick();
+  last_blink_time = HAL_GetTick();
 
-  } else {
-	  send_bluetooth_message("⚠️ Gyro not available - using basic movement\r\n");
-  }
-
-
-
-  //mpu9250_send_status();
-  turn_in_place_gyro( 90.0f, 650, 2500);  // left 90°
-
-
-  // run a left-turn step test
-  //run_gyro_turn_step_test(600, 150, 1000, 2000, 10, 3000);
-
-
-
-  // Test ADC functionality
-//  update_sensors();
-//  if (sensors.battery == 0 && sensors.front_left == 0 &&
-//      sensors.front_right == 0 && sensors.side_left == 0 && sensors.side_right == 0) {
-//      send_bluetooth_message("❌ CRITICAL: All sensors reading zero - ADC failure!\r\n");
+//  while (!start_flag) {
+//      HAL_Delay(10);
+//      HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin); // Blink indicator
 //  }
-//
-  // Test encoder functionality
-  start_encoders();
-  HAL_Delay(100);
-  //for encoder PID csv generation////////////////////////////////
-  send_bluetooth_printf("TEST HAL_GetTick=%lu\r\n", (unsigned long)HAL_GetTick());
-  send_bluetooth_printf("LeftEnc=%ld RightEnc=%ld\r\n", (long)get_left_encoder_total(), (long)get_right_encoder_total());
 
-  //run_gyro_step_test(600, 100, 1000, 2500, 10, 3000); // base=600, delta=100, start=1000ms, hold 2500ms, sample=10ms, total=3000ms
+
+    // run a left-turn step test
+  //r// base, delta, delay_before_step(ms), step_duration(ms), sample_ms, total_ms
+//  run_gyro_step_test(700, 200, 1000, 2000, 5, 7000);   // +delta (turn one way)
+//  HAL_Delay(1500);
+//  run_gyro_step_test(700,-200, 1000, 2000, 5, 7000);   // -delta (turn the other way)
+//  HAL_Delay(1500);
+//  run_gyro_step_test(600, 200, 1000, 2000, 5, 7000);   // check base dependence
+//  HAL_Delay(1500);
+//  run_gyro_step_test(800, 200, 1000, 2000, 5, 7000);
+
 
    //use gyro PID/////////////////////////////////////////////////////////////
 //  moveStraightGyroPID_Reset();
@@ -223,7 +330,32 @@ int main(void)
 //  }
 //  break_motors();
 
-  HAL_Delay(100);
+
+  // Sensor Fusion///////////////////////////////////////////////////////////////////////
+  // use single fusion straight controller
+//  fusion_reset();
+//  fusion_set_heading_ref_to_current();  // lock heading for this straight
+//
+//  while (1) {
+//      fusion_step(650);                 // pick your cruise PWM (or 0 to use WF_BASE_PWM)
+//      // optional telemetry
+//      // send_bluetooth_printf("L:%ld R:%ld\r\n", get_left_encoder_total(), get_right_encoder_total());
+//      HAL_Delay(2);                     // ~500 Hz outer loop
+//  }
+
+
+  // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
+  int mode = 0;               // WF_AUTO
+  int base_pwm = 500;         // use the speed you tuned at
+
+  // bootstrap targets & reset integrators
+  wall_follow_reset_int(mode, base_pwm);
+
+  while (1) {
+      wall_follow_step();     // computes e, PID, sets motor PWMs
+      HAL_Delay(2);           // keep a steady loop
+  }
+
 
 
 //  debug_encoder_setup();
@@ -231,62 +363,31 @@ int main(void)
 //  test_encoder_rotation();
 
 
-  if (get_left_encoder_total() == 0 && get_right_encoder_total() == 0) {
-      send_bluetooth_message("⚠️ WARNING: Encoders may not be working\r\n");
-      // Don't mark as critical failure - encoders might be stationary
-  }
-
-
-
-
-  /* Play startup tone */
-  play_startup_tone();
-
-  /* Status LEDs test */
-  HAL_GPIO_WritePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin, GPIO_PIN_SET);
-  HAL_GPIO_WritePin(LED_RIGHT_GPIO_Port, LED_RIGHT_Pin, GPIO_PIN_SET);
-  HAL_Delay(1000);
-  HAL_GPIO_WritePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(LED_RIGHT_GPIO_Port, LED_RIGHT_Pin, GPIO_PIN_RESET);
-
-  /* Send startup message via Bluetooth */
-  send_bluetooth_message("Championship Micromouse Ready!\r\n");
-
-  send_championship_stats();
-
-  /* Wait for start button */
-  send_bluetooth_message("Press button to start exploration...\r\n");
-  while (!start_flag) {
-      HAL_Delay(10);
-      // Blink LED to show ready state
-      HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin);
-  }
-
-  /* Reset LEDs */
-  HAL_GPIO_WritePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin, GPIO_PIN_RESET);
-  HAL_GPIO_WritePin(LED_RIGHT_GPIO_Port, LED_RIGHT_Pin, GPIO_PIN_RESET);
-
-  /* Start exploration after delay */
-  play_confirmation_tone();
-  HAL_Delay(2000);
-
-  /* Main micromouse algorithm */
-  send_bluetooth_message("Starting maze exploration...\r\n");
-
   /* Initialize movement system */
 
   // get ADC Values//////////////////////////////////////////////////////
-  start_encoders();
-//  calibrate_sensors();
+  //calibrate_sensors();
 //  while(1){
-//	  //update_sensors();
-//	  diagnostic_sensor_test();
+//	  update_sensors();
+//
 //	  HAL_Delay(500);
 //  }
 
-  /* Execute championship exploration */
-  championship_exploration_with_analysis();
-  //test_scurve_single_cell();
+  run_wall_single_left_step_test(   // correct one to use with one wall
+      /*base_pwm=*/650,
+      /*delta_pwm=*/150,
+      /*step_delay_ms=*/1000,
+      /*step_duration_ms=*/2000,
+      /*sample_ms=*/10,      // 100 Hz; use 20 if BLE is slow
+      /*total_ms=*/6000
+  );
+
+
+  //  run_wall_lateral_step_test(
+  //      /*base_pwm=*/500,   /*delta_pwm=*/150,
+  //      /*step_delay_ms=*/1000, /*step_duration_ms=*/2000,
+  //      /*sample_ms=*/10,   /*total_ms=*/6000);
+
 
 
   /* USER CODE END 2 */
@@ -299,51 +400,60 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	  update_sensors();
+	// Handle button events
+	if (button_pressed == 1) {
+		button_pressed = 0;
 
+		if (!exploration_started && system_ready) {
+			send_bluetooth_message("\r\n🚀 STARTING MAZE EXPLORATION! 🚀\r\n");
+			play_confirmation_tone();
+			HAL_Delay(1000);
 
-	  if (button_pressed == 1) {
-	          button_pressed = 0;
-	          // Left button - start speed run or new exploration
-	          if (robot.center_reached && robot.returned_to_start) {
-	              championship_speed_run();
-	          } else {
-	              send_bluetooth_message("Starting enhanced championship exploration...\r\n");
-	              reset_championship_micromouse();
-	              championship_exploration_with_analysis();
-	          }
-	      }
+			exploration_started = true;
+			run_maze_exploration_sequence();
 
-	  if (button_pressed == 2) {
-		  button_pressed = 0;
+		} else if (is_exploration_complete()) {
+			send_bluetooth_message("\r\n🏁 EXPLORATION COMPLETE - Ready for speed run! 🏁\r\n");
+			send_performance_metrics();
 
-		  // Right button - test S-curve movement or reset system
-		  test_scurve_single_cell();
-		  mpu9250_read_gyro();
+		} else if (!system_ready) {
+			send_bluetooth_message("⚠️ System not ready - check diagnostics!\r\n");
+			play_error_tone();
+		}
+	}
 
+	if (button_pressed == 2) {
+		button_pressed = 0;
 
-	  }
+		// Right button - emergency stop or reset
+		if (exploration_started && !is_exploration_complete()) {
+			send_bluetooth_message("🛑 EMERGENCY STOP!\r\n");
+			stop_motors();
+			play_error_tone();
+			exploration_started = false;
+		} else {
+			// Send detailed status
+			send_bluetooth_message("\r\n📊 DETAILED STATUS REPORT 📊\r\n");
+			send_maze_state();
+			send_sensor_data();
+			send_position_data();
+			if (exploration_started) {
+				send_performance_metrics();
+			}
+		}
+	}
 
+	// Send periodic status updates
+	send_periodic_status();
 
+	// If exploration is running, let it continue
+	if (exploration_started && !is_exploration_complete()) {
+		// The exploration runs in run_maze_exploration_sequence()
+		// and handles its own loop until complete
+	}
 
-
-
-
-	  // Send periodic status updates
-	  static uint32_t last_status = 0;
-	  if (HAL_GetTick() - last_status > 5000) {
-		  send_battery_status();
-		  last_status = HAL_GetTick();
-	  }
-
-	  // Blink LED to show system is alive
-	  static uint32_t last_blink = 0;
-	  if (HAL_GetTick() - last_blink > 2000) {
-		  HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin);
-		  last_blink = HAL_GetTick();
-	  }
-
-	  HAL_Delay(100);
+	// Small delay to prevent overwhelming the system
+	HAL_Delay(50);
 
   }
   /* USER CODE END 3 */
@@ -418,13 +528,13 @@ static void MX_ADC1_Init(void)
   hadc1.Instance = ADC1;
   hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
   hadc1.Init.Resolution = ADC_RESOLUTION_12B;
-  hadc1.Init.ScanConvMode = ENABLE;
-  hadc1.Init.ContinuousConvMode = ENABLE;
+  hadc1.Init.ScanConvMode = DISABLE;
+  hadc1.Init.ContinuousConvMode = DISABLE;
   hadc1.Init.DiscontinuousConvMode = DISABLE;
   hadc1.Init.ExternalTrigConvEdge = ADC_EXTERNALTRIGCONVEDGE_NONE;
   hadc1.Init.ExternalTrigConv = ADC_SOFTWARE_START;
   hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-  hadc1.Init.NbrOfConversion = 5;
+  hadc1.Init.NbrOfConversion = 1;
   hadc1.Init.DMAContinuousRequests = DISABLE;
   hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
   if (HAL_ADC_Init(&hadc1) != HAL_OK)
@@ -436,43 +546,7 @@ static void MX_ADC1_Init(void)
   */
   sConfig.Channel = ADC_CHANNEL_0;
   sConfig.Rank = 1;
-  sConfig.SamplingTime = ADC_SAMPLETIME_3CYCLES;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-  sConfig.Channel = ADC_CHANNEL_2;
-  sConfig.Rank = 2;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-  sConfig.Channel = ADC_CHANNEL_3;
-  sConfig.Rank = 3;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-  sConfig.Channel = ADC_CHANNEL_4;
-  sConfig.Rank = 4;
-  if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
-  {
-    Error_Handler();
-  }
-
-  /** Configure for the selected ADC regular channel its corresponding rank in the sequencer and its sample time.
-  */
-  sConfig.Channel = ADC_CHANNEL_5;
-  sConfig.Rank = 5;
+  sConfig.SamplingTime = ADC_SAMPLETIME_84CYCLES;
   if (HAL_ADC_ConfigChannel(&hadc1, &sConfig) != HAL_OK)
   {
     Error_Handler();
