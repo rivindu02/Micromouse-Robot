@@ -150,10 +150,21 @@ void moveStraightGyroPID(void);
 void moveStraightGyroPID_Reset(void);
 void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms);
 
+void fusion_step(int base_pwm);
+void fusion_reset(void);
+void fusion_set_heading_ref_to_current(void);
+void wall_follow_reset_int(int mode, int base_pwm);
+void wall_follow_step(void);
+
+
+
+
 /* logging _tests */
 void run_gyro_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms, uint32_t sample_ms, uint32_t total_ms);
 void run_encoder_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms, uint32_t sample_ms, uint32_t total_ms);
 void run_gyro_turn_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms,uint32_t sample_ms, uint32_t total_ms);
+void run_wall_lateral_step_test(int base_pwm, int delta_pwm,uint32_t step_delay_ms, uint32_t step_duration_ms,uint32_t sample_ms, uint32_t total_ms);
+void run_wall_single_left_step_test(int base_pwm, int delta_pwm,uint32_t step_delay_ms, uint32_t step_duration_ms,uint32_t sample_ms, uint32_t total_ms);
 
 /* Sensor functions */
 void calibrate_sensors(void);

@@ -309,7 +309,15 @@ int main(void)
 
 
     // run a left-turn step test
-  //run_gyro_step_test(600, 100, 1000, 2500, 10, 3000); // base=600, delta=100, start=1000ms, hold 2500ms, sample=10ms, total=3000ms
+  //r// base, delta, delay_before_step(ms), step_duration(ms), sample_ms, total_ms
+//  run_gyro_step_test(700, 200, 1000, 2000, 5, 7000);   // +delta (turn one way)
+//  HAL_Delay(1500);
+//  run_gyro_step_test(700,-200, 1000, 2000, 5, 7000);   // -delta (turn the other way)
+//  HAL_Delay(1500);
+//  run_gyro_step_test(600, 200, 1000, 2000, 5, 7000);   // check base dependence
+//  HAL_Delay(1500);
+//  run_gyro_step_test(800, 200, 1000, 2000, 5, 7000);
+
 
    //use gyro PID/////////////////////////////////////////////////////////////
 //  moveStraightGyroPID_Reset();
@@ -321,6 +329,32 @@ int main(void)
 //	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
 //  }
 //  break_motors();
+
+
+  // Sensor Fusion///////////////////////////////////////////////////////////////////////
+  // use single fusion straight controller
+//  fusion_reset();
+//  fusion_set_heading_ref_to_current();  // lock heading for this straight
+//
+//  while (1) {
+//      fusion_step(650);                 // pick your cruise PWM (or 0 to use WF_BASE_PWM)
+//      // optional telemetry
+//      // send_bluetooth_printf("L:%ld R:%ld\r\n", get_left_encoder_total(), get_right_encoder_total());
+//      HAL_Delay(2);                     // ~500 Hz outer loop
+//  }
+
+
+  // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
+//  int mode = 0;               // WF_AUTO
+//  int base_pwm = 700;         // use the speed you tuned at
+//
+//  // bootstrap targets & reset integrators
+//  wall_follow_reset_int(mode, base_pwm);
+//
+//  while (1) {
+//      wall_follow_step();     // computes e, PID, sets motor PWMs
+//      HAL_Delay(2);           // keep a steady loop
+//  }
 
 
 
@@ -338,6 +372,22 @@ int main(void)
 
 	  HAL_Delay(500);
   }
+
+//  run_wall_single_left_step_test(   // correct one to use with one wall
+//      /*base_pwm=*/500,
+//      /*delta_pwm=*/150,
+//      /*step_delay_ms=*/1000,
+//      /*step_duration_ms=*/2000,
+//      /*sample_ms=*/10,      // 100 Hz; use 20 if BLE is slow
+//      /*total_ms=*/6000
+//  );
+
+
+  //  run_wall_lateral_step_test(
+  //      /*base_pwm=*/500,   /*delta_pwm=*/150,
+  //      /*step_delay_ms=*/1000, /*step_duration_ms=*/2000,
+  //      /*sample_ms=*/10,   /*total_ms=*/6000);
+
 
 
   /* USER CODE END 2 */

@@ -1,11 +1,8 @@
 ../Core/Src/logging_tests.c:26:13:log_printf	1
 ../Core/Src/logging_tests.c:47:14:clampf	3
-../Core/Src/logging_tests.c:56:6:run_gyro_step_test	7
-../Core/Src/logging_tests.c:124:6:run_encoder_step_test	7
-../Core/Src/logging_tests.c:185:6:run_gyro_turn_step_test	5
-../Core/Src/logging_tests.c:237:21:sgnf	2
-../Core/Src/logging_tests.c:244:13:wall_error_normalized	11
-../Core/Src/logging_tests.c:290:6:run_wall_follow_pid_test	19
-../Core/Src/logging_tests.c:419:6:run_wall_follow_pid_test_both_default	1
-../Core/Src/logging_tests.c:426:6:run_wall_follow_pid_test_left_default	1
-../Core/Src/logging_tests.c:433:6:run_wall_follow_pid_test_right_default	1
+../Core/Src/logging_tests.c:52:19:clampi	2
+../Core/Src/logging_tests.c:60:6:run_gyro_step_test	7
+../Core/Src/logging_tests.c:128:6:run_encoder_step_test	7
+../Core/Src/logging_tests.c:189:6:run_gyro_turn_step_test	5
+../Core/Src/logging_tests.c:235:6:run_wall_lateral_step_test	5
+../Core/Src/logging_tests.c:297:6:run_wall_single_left_step_test	10
