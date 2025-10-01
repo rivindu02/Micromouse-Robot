@@ -345,16 +345,16 @@ int main(void)
 
 
   // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
-//  int mode = 0;               // WF_AUTO
-//  int base_pwm = 700;         // use the speed you tuned at
-//
-//  // bootstrap targets & reset integrators
-//  wall_follow_reset_int(mode, base_pwm);
-//
-//  while (1) {
-//      wall_follow_step();     // computes e, PID, sets motor PWMs
-//      HAL_Delay(2);           // keep a steady loop
-//  }
+  int mode = 0;               // WF_AUTO
+  int base_pwm = 500;         // use the speed you tuned at
+
+  // bootstrap targets & reset integrators
+  wall_follow_reset_int(mode, base_pwm);
+
+  while (1) {
+      wall_follow_step();     // computes e, PID, sets motor PWMs
+      HAL_Delay(2);           // keep a steady loop
+  }
 
 
 
@@ -367,20 +367,20 @@ int main(void)
 
   // get ADC Values//////////////////////////////////////////////////////
   //calibrate_sensors();
-  while(1){
-	  update_sensors();
+//  while(1){
+//	  update_sensors();
+//
+//	  HAL_Delay(500);
+//  }
 
-	  HAL_Delay(500);
-  }
-
-//  run_wall_single_left_step_test(   // correct one to use with one wall
-//      /*base_pwm=*/500,
-//      /*delta_pwm=*/150,
-//      /*step_delay_ms=*/1000,
-//      /*step_duration_ms=*/2000,
-//      /*sample_ms=*/10,      // 100 Hz; use 20 if BLE is slow
-//      /*total_ms=*/6000
-//  );
+  run_wall_single_left_step_test(   // correct one to use with one wall
+      /*base_pwm=*/650,
+      /*delta_pwm=*/150,
+      /*step_delay_ms=*/1000,
+      /*step_duration_ms=*/2000,
+      /*sample_ms=*/10,      // 100 Hz; use 20 if BLE is slow
+      /*total_ms=*/6000
+  );
 
 
   //  run_wall_lateral_step_test(

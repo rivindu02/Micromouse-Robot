@@ -1,7 +1,7 @@
 ../Core/Src/main.c:121:13:initialize_hardware_systems	8	static
 ../Core/Src/main.c:168:13:run_system_diagnostics	8	static
 ../Core/Src/main.c:208:13:send_periodic_status	16	static
-../Core/Src/main.c:244:5:main	8	static
+../Core/Src/main.c:244:5:main	16	static
 ../Core/Src/main.c:466:6:SystemClock_Config	88	static
 ../Core/Src/main.c:513:13:MX_ADC1_Init	24	static
 ../Core/Src/main.c:565:13:MX_SPI2_Init	8	static

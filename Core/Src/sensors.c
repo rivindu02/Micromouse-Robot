@@ -155,7 +155,7 @@ static uint16_t measure_sync(GPIO_TypeDef* port, uint16_t pin, uint32_t ch) {
     return avg;
 }
 
-void update_sensors(void){
+void update_sensors4(void){
     uint32_t ch[4] = {ADC_CHANNEL_5, ADC_CHANNEL_2, ADC_CHANNEL_4, ADC_CHANNEL_3};
     GPIO_TypeDef* p[4]= {EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_RIGHT_GPIO_Port,
                          EMIT_SIDE_LEFT_GPIO_Port,  EMIT_SIDE_RIGHT_GPIO_Port};
@@ -195,7 +195,7 @@ uint32_t FR_buff[5];
 uint32_t L_buff[5];
 uint32_t R_buff[5];
 
-void update_sensors4(void){
+void update_sensors(void){
 	turn_off_emitters();
 	//dwt_delay_us(500);
 	uint16_t off_FL = read_adc_channel(ADC_CHANNEL_5);
@@ -205,7 +205,7 @@ void update_sensors4(void){
 
 	EMIT_ON(EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_LEFT_Pin);
 	EMIT_ON(EMIT_FRONT_RIGHT_GPIO_Port, EMIT_FRONT_RIGHT_Pin);
-	dwt_delay_us(500);
+	dwt_delay_us(50);
 	//HAL_Delay(1);
 
 	uint16_t on_FL = read_adc_channel(ADC_CHANNEL_5);
@@ -214,7 +214,7 @@ void update_sensors4(void){
 	turn_off_emitters();
 	EMIT_ON(EMIT_SIDE_LEFT_GPIO_Port, EMIT_SIDE_LEFT_Pin);
 	EMIT_ON(EMIT_SIDE_RIGHT_GPIO_Port, EMIT_SIDE_RIGHT_Pin);
-	dwt_delay_us(800);
+	dwt_delay_us(80);
 	//HAL_Delay(1);
 
 	uint16_t on_L = read_adc_channel(ADC_CHANNEL_4);
@@ -306,9 +306,9 @@ void update_sensors4(void){
 //	                          on_L, off_L,on_R, off_R);
 
 
-	send_bluetooth_printf("FL:%u   FR:%u  Fwall: %d SL:%u Lwall: %d  SR:%u  Rwall: %d  \r\n",
-		                          sensors.front_left, sensors.front_right,sensors.wall_front,
-		                          sensors.side_left, sensors.wall_left, sensors.side_right, sensors.wall_right);
+//	send_bluetooth_printf("FL:%u   FR:%u  Fwall: %d SL:%u Lwall: %d  SR:%u  Rwall: %d  \r\n",
+//		                          sensors.front_left, sensors.front_right,sensors.wall_front,
+//		                          sensors.side_left, sensors.wall_left, sensors.side_right, sensors.wall_right);
 
 }
 

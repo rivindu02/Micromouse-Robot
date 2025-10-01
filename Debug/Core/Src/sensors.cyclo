@@ -4,8 +4,8 @@
 ../Core/Src/sensors.c:113:20:dwt_delay_us	2
 ../Core/Src/sensors.c:125:24:diff_once	2
 ../Core/Src/sensors.c:143:17:measure_sync	5
-../Core/Src/sensors.c:158:6:update_sensors	8
-../Core/Src/sensors.c:198:6:update_sensors4	12
+../Core/Src/sensors.c:158:6:update_sensors4	8
+../Core/Src/sensors.c:198:6:update_sensors	12
 ../Core/Src/sensors.c:318:6:update_walls	22
 ../Core/Src/sensors.c:376:6:calibrate_sensors	19
 ../Core/Src/sensors.c:600:6:is_sensor_calibration_valid	1

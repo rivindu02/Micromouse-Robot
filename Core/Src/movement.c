@@ -714,12 +714,14 @@ void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms)
 // ================== WALL FOLLOW PID (ADD) ===================
 
 // ---------- Tunables ----------
-static int   WF_BASE_PWM        = 600;     // cruise PWM
+static int   WF_BASE_PWM        = 500;     // cruise PWM
 static int   WF_PWM_MIN_MOVE    = 50;      // overcome stiction
 static int   WF_PWM_MAX         = 1000;    // clamp
-static float WF_KP = 0.560553f;
-static float WF_KI = 0.103046f;   // integral uses e_int += e * dt  (dt in seconds)
-static float WF_KD = 0.003882f;   // derivative uses d = Δe / dt
+
+//Kp=0.003115  Ki=0.001479  Kd=0.270515
+static float WF_KP = 1.0f;
+static float WF_KI = 0.0f;   // integral uses e_int += e * dt  (dt in seconds)
+static float WF_KD = 0.0f;   // derivative uses d = Δe / dt
 static float WF_DERIV_ALPHA     = 0.85f;   // derivative low-pass (0..1)
 static float WF_INT_LIMIT       = 250.0f;  // anti-windup clamp
 static float WF_SINGLE_ALPHA    = 0.03f;   // EMA for single-wall target tracking
@@ -757,6 +759,7 @@ void wall_follow_reset_int(int mode, int base_pwm)
 
     e_int = 0.0f; e_prev = 0.0f; d_filt = 0.0f;
     wf_last_ms = HAL_GetTick();
+    update_sensors();
 
     // bootstrap targets from current readings (prevents initial jump)
     target_left  = (float)sensors.side_left;
