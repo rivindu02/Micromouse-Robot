@@ -175,8 +175,9 @@ bool are_sensors_healthy(void);
 void adc_system_diagnostics(void);
 
 static uint32_t dwt_cycles_per_us;
-static inline void dwt_delay_us(uint32_t us);
 void dwt_delay_init(uint32_t cpu_hz);
+
+void dwt_delay_us(uint32_t us);
 
 extern int point;
 

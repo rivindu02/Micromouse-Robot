@@ -26,7 +26,7 @@
 ../Core/Src/movement.c:747:19:clampi	24	static
 ../Core/Src/movement.c:748:21:clampf	24	static
 ../Core/Src/movement.c:755:6:wall_follow_reset_int	16	static
-../Core/Src/movement.c:770:6:wall_follow_step	120	static
+../Core/Src/movement.c:770:6:wall_follow_step	72	static
 ../Core/Src/movement.c:890:6:fusion_reset	8	static
 ../Core/Src/movement.c:911:6:fusion_set_heading_ref_to_current	4	static
 ../Core/Src/movement.c:917:6:fusion_step	112	static

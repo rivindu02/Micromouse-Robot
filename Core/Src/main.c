@@ -110,10 +110,12 @@ static void run_system_diagnostics(void);
 static void send_periodic_status(void);
 extern void dwt_delay_init(uint32_t cpu_hz);
 
+
 /* USER CODE END PFP */
 
 /* Private user code ---------------------------------------------------------*/
 /* USER CODE BEGIN 0 */
+
 
 /**
  * @brief Initialize all hardware systems and perform diagnostics
@@ -353,7 +355,8 @@ int main(void)
 
   while (1) {
       wall_follow_step();     // computes e, PID, sets motor PWMs
-      HAL_Delay(2);           // keep a steady loop
+      //HAL_Delay(2);           // keep a steady loop
+      dwt_delay_us(50);
   }
 
 

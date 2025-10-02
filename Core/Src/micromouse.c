@@ -54,6 +54,21 @@ static void queue_push(BFSQueue* q, Position pos) {
 static Position queue_pop(BFSQueue* q) {
     return q->queue[q->head++];
 }
+static uint32_t dwt_cycles_per_us;
+
+void dwt_delay_us(uint32_t us) {
+    uint32_t start = DWT->CYCCNT;
+    uint32_t ticks = us * dwt_cycles_per_us;
+    while ((DWT->CYCCNT - start) < ticks) { __NOP(); }
+}
+void dwt_delay_init(uint32_t cpu_hz) {
+    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
+    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
+    dwt_cycles_per_us = cpu_hz / 1000000U; // e.g., 84 for 84 MHz
+}
+
+
+
 
 /**
  * @brief Initialize maze for exploration

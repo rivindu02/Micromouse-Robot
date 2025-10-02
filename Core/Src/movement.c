@@ -799,17 +799,17 @@ void wall_follow_step(void)
         float R = (float)sensors.side_right;
         e = WF_BOTH_SCALE * (logf(L + 1.0f) - logf(R + 1.0f));
         // keep single-wall targets gently aligned to present gap
-        target_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*L;
-        target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*R;
+        //target_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*L;
+        //target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*R;
 
     } else if (Lw) {
         float L = (float)sensors.side_left;
-        target_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*L;
+        //arget_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*L;
         e = logf(L + 1.0f) - logf(target_left + 1.0f);
 
     } else if (Rw) {
         float R = (float)sensors.side_right;
-        target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*R;
+        //target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*R;
         e = logf(target_right + 1.0f) - logf(R + 1.0f);
 
     } else {
@@ -837,8 +837,8 @@ void wall_follow_step(void)
     }
 
     // Map correction to wheel PWMs (right = base+u, left = base-u)
-    int pwm_right = clampi((int)lroundf((float)base + u), 0, WF_PWM_MAX);
-    int pwm_left  = clampi((int)lroundf((float)base - u), 0, WF_PWM_MAX);
+    int pwm_right = clampi((int)lroundf((float)base - u), 0, WF_PWM_MAX);
+    int pwm_left  = clampi((int)lroundf((float)base + u), 0, WF_PWM_MAX);
 
     if (pwm_right > 0 && pwm_right < WF_PWM_MIN_MOVE) pwm_right = WF_PWM_MIN_MOVE;
     if (pwm_left  > 0 && pwm_left  < WF_PWM_MIN_MOVE) pwm_left  = WF_PWM_MIN_MOVE;
@@ -847,8 +847,8 @@ void wall_follow_step(void)
     motor_set(0, true, (uint16_t)pwm_left);   // Left
     motor_set(1, true, (uint16_t)pwm_right);  // Right
 
-    send_bluetooth_printf("# L:%d R:%d e=%.3f u_norm=%.3f u=%.1f\n",
-        sensors.side_left, sensors.side_right, e, u_norm, u);
+//    send_bluetooth_printf("# L:%d R:%d e=%.3f u_norm=%.3f u=%.1f\n",
+//        sensors.side_left, sensors.side_right, e, u_norm, u);
 
 }
 
@@ -904,8 +904,8 @@ void fusion_reset(void)
     // capture initial targets to avoid a jump at start
     // for the Target, values should be updated -------------------->
     update_sensors();
-    target_left  = (float)sensors.side_left;
-    target_right = (float)sensors.side_right;
+    //target_left  = (float)sensors.side_left;
+    //target_right = (float)sensors.side_right;
 }
 
 void fusion_set_heading_ref_to_current(void)
@@ -940,13 +940,13 @@ void fusion_step(int base_pwm)
     if (Lw && Rw) {
         e_wall = WF_BOTH_SCALE * (logf((float)L + 1.0f) - logf((float)R + 1.0f));
         // keep single-wall targets gently aligned (same as wall_follow_step)
-        target_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*(float)L;
-        target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*(float)R;
+        //target_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*(float)L;
+        //target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*(float)R;
     } else if (Lw) {
-        target_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*(float)L;
+        //target_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*(float)L;
         e_wall = logf((float)L + 1.0f) - logf(target_left + 1.0f);
     } else if (Rw) {
-        target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*(float)R;
+        //target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*(float)R;
         e_wall = logf(target_right + 1.0f) - logf((float)R + 1.0f);
     } else {
         e_wall = 0.0f;

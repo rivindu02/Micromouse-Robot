@@ -102,19 +102,6 @@ uint16_t read_adc_channel(uint32_t channel) {
 // sensors.c
 
 
-static uint32_t dwt_cycles_per_us;
-
-void dwt_delay_init(uint32_t cpu_hz) {
-    CoreDebug->DEMCR |= CoreDebug_DEMCR_TRCENA_Msk;
-    DWT->CTRL |= DWT_CTRL_CYCCNTENA_Msk;
-    dwt_cycles_per_us = cpu_hz / 1000000U; // e.g., 84 for 84 MHz
-}
-
-static inline void dwt_delay_us(uint32_t us) {
-    uint32_t start = DWT->CYCCNT;
-    uint32_t ticks = us * dwt_cycles_per_us;
-    while ((DWT->CYCCNT - start) < ticks) { __NOP(); }
-}
 
 
 // ---- Tunables ----
