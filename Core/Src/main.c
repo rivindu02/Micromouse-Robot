@@ -337,7 +337,7 @@ int main(void)
 //  fusion_set_heading_ref_to_current();  // lock heading for this straight
 //
 //  while (1) {
-//      fusion_step(650);                 // pick your cruise PWM (or 0 to use WF_BASE_PWM)
+//      fusion_step(570);                 // pick your cruise PWM (or 0 to use WF_BASE_PWM)
 //      // optional telemetry
 //      // send_bluetooth_printf("L:%ld R:%ld\r\n", get_left_encoder_total(), get_right_encoder_total());
 //      HAL_Delay(2);                     // ~500 Hz outer loop
@@ -346,7 +346,7 @@ int main(void)
 
   // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
   int mode = 0;               // WF_AUTO
-  int base_pwm = 500;         // use the speed you tuned at
+  int base_pwm = 570;         // use the speed you tuned at
 
   // bootstrap targets & reset integrators
   wall_follow_reset_int(mode, base_pwm);
@@ -373,14 +373,14 @@ int main(void)
 //	  HAL_Delay(500);
 //  }
 
-  run_wall_single_left_step_test(   // correct one to use with one wall
-      /*base_pwm=*/650,
-      /*delta_pwm=*/150,
-      /*step_delay_ms=*/1000,
-      /*step_duration_ms=*/2000,
-      /*sample_ms=*/10,      // 100 Hz; use 20 if BLE is slow
-      /*total_ms=*/6000
-  );
+//  run_wall_single_left_step_test(   // correct one to use with one wall
+//      /*base_pwm=*/650,
+//      /*delta_pwm=*/150,
+//      /*step_delay_ms=*/1000,
+//      /*step_duration_ms=*/2000,
+//      /*sample_ms=*/10,      // 100 Hz; use 20 if BLE is slow
+//      /*total_ms=*/6000
+//  );
 
 
   //  run_wall_lateral_step_test(

@@ -5,7 +5,7 @@
 ../Core/Src/sensors.c:125:24:diff_once	32	static
 ../Core/Src/sensors.c:143:17:measure_sync	48	static
 ../Core/Src/sensors.c:158:6:update_sensors4	96	static
-../Core/Src/sensors.c:198:6:update_sensors	72	static
+../Core/Src/sensors.c:198:6:update_sensors	96	static
 ../Core/Src/sensors.c:318:6:update_walls	72	static
 ../Core/Src/sensors.c:376:6:calibrate_sensors	168	static
 ../Core/Src/sensors.c:600:6:is_sensor_calibration_valid	4	static

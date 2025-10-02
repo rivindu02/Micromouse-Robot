@@ -36,7 +36,7 @@
 
 /* Sensor thresholds */
 #define WALL_THRESHOLD_FRONT 50   //2000
-#define WALL_THRESHOLD_SIDE 25      //1500
+#define WALL_THRESHOLD_SIDE 20      //1500
 #define BATTERY_LOW_THRESHOLD 3000
 #define IR_AMBIENT_THRESHOLD 500
 

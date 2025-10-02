@@ -532,7 +532,7 @@ void moveStraightGyroPID(void) {
     float correction = (Kp_g * error) + (Ki_g * pid_integral) + (Kd_g * pid_deriv_filt);
 
     /* Base PWM for forward motion (adjust to your nominal cruising PWM) */
-    const int base_pwm = 700;
+    const int base_pwm = 570;
 
     int motor1Speed = (int)roundf((float)base_pwm - correction); // right wheel in your mapping
     int motor2Speed = (int)roundf((float)base_pwm + correction); // left wheel
@@ -741,8 +741,8 @@ static wf_mode_t wf_mode = WF_AUTO;
 static float e_int = 0.0f, e_prev = 0.0f, d_filt = 0.0f;
 static uint32_t wf_last_ms = 0;
 
-static float target_left  = 0.0f;  // learned sensor targets for single-wall
-static float target_right = 0.0f;
+static float target_left  = 23.0f;  // learned sensor targets for single-wall
+static float target_right = 25.0f;
 
 static inline int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 static inline float clampf(float v, float lo, float hi){ return v < lo ? lo : (v > hi ? hi : v); }
@@ -762,8 +762,8 @@ void wall_follow_reset_int(int mode, int base_pwm)
     update_sensors();
 
     // bootstrap targets from current readings (prevents initial jump)
-    target_left  = (float)sensors.side_left;
-    target_right = (float)sensors.side_right;
+    //target_left  = (float)sensors.side_left;
+    //target_right = (float)sensors.side_right;
 }
 
 // One control step; call at ~200–500 Hz inside your loop
@@ -902,6 +902,7 @@ void fusion_reset(void)
     fus_last_ms = HAL_GetTick();
 
     // capture initial targets to avoid a jump at start
+    // for the Target, values should be updated -------------------->
     update_sensors();
     target_left  = (float)sensors.side_left;
     target_right = (float)sensors.side_right;

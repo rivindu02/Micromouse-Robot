@@ -28,8 +28,8 @@
 ../Core/Src/movement.c:755:6:wall_follow_reset_int	3
 ../Core/Src/movement.c:770:6:wall_follow_step	17
 ../Core/Src/movement.c:890:6:fusion_reset	1
-../Core/Src/movement.c:910:6:fusion_set_heading_ref_to_current	1
-../Core/Src/movement.c:916:6:fusion_step	24
-../Core/Src/movement.c:1232:6:debug_encoder_setup	3
-../Core/Src/movement.c:1255:6:test_encoder_manual	1
-../Core/Src/movement.c:1268:6:test_encoder_rotation	2
+../Core/Src/movement.c:911:6:fusion_set_heading_ref_to_current	1
+../Core/Src/movement.c:917:6:fusion_step	24
+../Core/Src/movement.c:1233:6:debug_encoder_setup	3
+../Core/Src/movement.c:1256:6:test_encoder_manual	1
+../Core/Src/movement.c:1269:6:test_encoder_rotation	2

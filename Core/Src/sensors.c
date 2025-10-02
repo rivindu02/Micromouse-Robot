@@ -306,9 +306,9 @@ void update_sensors(void){
 //	                          on_L, off_L,on_R, off_R);
 
 
-//	send_bluetooth_printf("FL:%u   FR:%u  Fwall: %d SL:%u Lwall: %d  SR:%u  Rwall: %d  \r\n",
-//		                          sensors.front_left, sensors.front_right,sensors.wall_front,
-//		                          sensors.side_left, sensors.wall_left, sensors.side_right, sensors.wall_right);
+	send_bluetooth_printf("FL:%u   FR:%u  Fwall: %d SL:%u Lwall: %d  SR:%u  Rwall: %d  \r\n",
+		                          sensors.front_left, sensors.front_right,sensors.wall_front,
+		                          sensors.side_left, sensors.wall_left, sensors.side_right, sensors.wall_right);
 
 }
 
