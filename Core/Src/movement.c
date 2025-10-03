@@ -324,16 +324,16 @@ void moveStraightPID(int base_pwm, bool left_forward, bool right_forward) {
     pid_last_ms = now;
 
     /* Read encoder totals */
-    int32_t left_total = get_left_encoder_total();
-    int32_t right_total = get_right_encoder_total();
+    int32_t left_total_e = get_left_encoder_total();
+    int32_t right_total_e = get_right_encoder_total();
 
     /* Delta counts in this interval */
-    int32_t dleft = left_total - prev_left_counts;
-    int32_t dright = right_total - prev_right_counts;
+    int32_t dleft = left_total_e - prev_left_counts;
+    int32_t dright = right_total_e - prev_right_counts;
 
     /* Save for next iteration */
-    prev_left_counts  = left_total;
-    prev_right_counts = right_total;
+    prev_left_counts  = left_total_e;
+    prev_right_counts = right_total_e;
 
     /* Convert to rate (counts per second). Using counts/s is robust and avoids
        huge integrator values on long runs. If you prefer physical units, convert
@@ -385,9 +385,9 @@ void moveStraightPID(int base_pwm, bool left_forward, bool right_forward) {
 //float Ki_g = 5.3769f;//0; // Integral term
 //float Kd_g = 0.0f;//2; // Derivative term
 
-float Kp_g = 0.40416f;
-float Ki_g = 1.5485f;
-float Kd_g = 0.0158228f;
+float Kp_g = 0.437213f;
+float Ki_g = 1.51547f;
+float Kd_g = 0.0189204f;
 
 //float error_g = 0;
 //float previousError_g = 0;
@@ -404,7 +404,7 @@ static const float DERIV_FILTER_ALPHA = 0.936768f;    // computed from dt_med=0.
 //static const float DERIV_FILTER_ALPHA =0.85f; //for moveStraightGyroPID2
 
 /* Integral clamp (anti-windup) */
-static const float INTEGRAL_LIMIT = 20.0f; // tune as needed (units: deg/s * s)
+static const float INTEGRAL_LIMIT = 5.0f; // tune as needed (units: deg/s * s)
 ////////////////////////////////////////
 // ---- Tuning knobs (start here) ----
 static const float ERR_DEADBAND   = 0.25f;   // deg/s; ignore tiny gyro bias

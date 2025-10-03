@@ -66,8 +66,8 @@ all: main-build
 main-build: Micromouse-Robot.elf secondary-outputs
 
 # Tool invocations
-Micromouse-Robot.elf Micromouse-Robot.map: $(OBJS) $(USER_OBJS) D:\Documents\STM32CubeIDE\workspace_1.17.0\Micromouse\ v1.0\STM32F411CEUX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
-	arm-none-eabi-gcc -o "Micromouse-Robot.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"D:\Documents\STM32CubeIDE\workspace_1.17.0\Micromouse v1.0\STM32F411CEUX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Micromouse-Robot.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
+Micromouse-Robot.elf Micromouse-Robot.map: $(OBJS) $(USER_OBJS) C:\Users\user\Documents\GitHub\Micromouse-Robot\STM32F411CEUX_FLASH.ld makefile objects.list $(OPTIONAL_TOOL_DEPS)
+	arm-none-eabi-gcc -o "Micromouse-Robot.elf" @"objects.list" $(USER_OBJS) $(LIBS) -mcpu=cortex-m4 -T"C:\Users\user\Documents\GitHub\Micromouse-Robot\STM32F411CEUX_FLASH.ld" --specs=nosys.specs -Wl,-Map="Micromouse-Robot.map" -Wl,--gc-sections -static -u _printf_float --specs=nano.specs -mfpu=fpv4-sp-d16 -mfloat-abi=hard -mthumb -Wl,--start-group -lc -lm -Wl,--end-group
 	@echo 'Finished building target: $@'
 	@echo ' '
 

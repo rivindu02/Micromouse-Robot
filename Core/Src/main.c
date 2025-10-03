@@ -322,15 +322,18 @@ int main(void)
 
 
    //use gyro PID/////////////////////////////////////////////////////////////
-//  moveStraightGyroPID_Reset();
-//  moveStraightPID_Reset();
-//  while(1){//get_left_encoder_total()<=2000 || get_right_encoder_total()<=2000){
-//	  mpu9250_read_gyro();
-//
-//	  moveStraightGyroPID();
-//	  send_bluetooth_printf("L:%ld R:%ld\r\n",get_left_encoder_total(),get_right_encoder_total());
-//  }
-//  break_motors();
+  moveStraightGyroPID_Reset();
+  //moveStraightPID_Reset();
+  int left=0;
+  int right=0;
+  while(left*(-1)<=2555 || right*(-1)<=2539){
+	  mpu9250_read_gyro();
+	  left=get_left_encoder_total();
+	  right=get_right_encoder_total();
+	  moveStraightGyroPID();
+	  //send_bluetooth_printf("L:%ld R:%ld\r\n",left,right);
+  }
+  break_motors();
 
 
   // Sensor Fusion///////////////////////////////////////////////////////////////////////
@@ -347,17 +350,17 @@ int main(void)
 
 
   // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
-  int mode = 0;               // WF_AUTO
-  int base_pwm = 570;         // use the speed you tuned at
-
-  // bootstrap targets & reset integrators
-  wall_follow_reset_int(mode, base_pwm);
-
-  while (1) {
-      wall_follow_step();     // computes e, PID, sets motor PWMs
-      //HAL_Delay(2);           // keep a steady loop
-      dwt_delay_us(50);
-  }
+//  int mode = 0;               // WF_AUTO
+//  int base_pwm = 570;         // use the speed you tuned at
+//
+//  // bootstrap targets & reset integrators
+//  wall_follow_reset_int(mode, base_pwm);
+//
+//  while (1) {
+//      wall_follow_step();     // computes e, PID, sets motor PWMs
+//      //HAL_Delay(2);           // keep a steady loop
+//      dwt_delay_us(50);
+//  }
 
 
 
@@ -367,9 +370,13 @@ int main(void)
 
 
   /* Initialize movement system */
+//  while(1){
+//	  send_encoder_status();
+//	  HAL_Delay(500);
+//  }
 
   // get ADC Values//////////////////////////////////////////////////////
-  //calibrate_sensors();
+//  calibrate_sensors();
 //  while(1){
 //	  update_sensors();
 //
