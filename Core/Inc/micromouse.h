@@ -35,14 +35,14 @@
 #define ENCODER_COUNTS_PER_TURN 500
 
 /* Sensor thresholds */
-#define WALL_THRESHOLD_FRONT 2000
-#define WALL_THRESHOLD_SIDE 1500
+#define WALL_THRESHOLD_FRONT 50   //2000
+#define WALL_THRESHOLD_SIDE 20      //1500
 #define BATTERY_LOW_THRESHOLD 3000
 #define IR_AMBIENT_THRESHOLD 500
 
 /*To move the encoder while stopped*/
-#define PWM_MIN_MOVE_LEFT   510
-#define PWM_MIN_MOVE_RIGHT  490
+#define PWM_MIN_MOVE_LEFT   500
+#define PWM_MIN_MOVE_RIGHT  500
 
 
 /* Audio frequencies (Hz) */
@@ -51,37 +51,7 @@
 #define TONE_SUCCESS 659
 #define TONE_ERROR 220
 
-/* Pin definitions (matching your PCB) */
-#define EMIT_FRONT_LEFT_Pin GPIO_PIN_9
-#define EMIT_FRONT_LEFT_GPIO_Port GPIOB
-#define EMIT_SIDE_LEFT_Pin GPIO_PIN_9
-#define EMIT_SIDE_LEFT_GPIO_Port GPIOA
-#define EMIT_SIDE_RIGHT_Pin GPIO_PIN_8
-#define EMIT_SIDE_RIGHT_GPIO_Port GPIOB
-#define EMIT_FRONT_RIGHT_Pin GPIO_PIN_8
-#define EMIT_FRONT_RIGHT_GPIO_Port GPIOA
 
-#define LED_LEFT_Pin GPIO_PIN_4
-#define LED_LEFT_GPIO_Port GPIOB
-#define LED_RIGHT_Pin GPIO_PIN_5
-#define LED_RIGHT_GPIO_Port GPIOB
-
-#define MOTOR_IN1_Pin GPIO_PIN_6
-#define MOTOR_IN1_GPIO_Port GPIOA
-#define MOTOR_IN2_Pin GPIO_PIN_7
-#define MOTOR_IN2_GPIO_Port GPIOA
-#define MOTOR_IN3_Pin GPIO_PIN_0
-#define MOTOR_IN3_GPIO_Port GPIOB
-#define MOTOR_IN4_Pin GPIO_PIN_1
-#define MOTOR_IN4_GPIO_Port GPIOB
-
-#define BTN_LEFT_Pin GPIO_PIN_1
-#define BTN_LEFT_GPIO_Port GPIOA
-#define BTN_RIGHT_Pin GPIO_PIN_10
-#define BTN_RIGHT_GPIO_Port GPIOB
-
-//#define GYRO_CS_Pin GPIO_PIN_2
-//#define GYRO_CS_GPIO_Port GPIOD
 
 #define GYRO_CS_Pin Chip_Select_Pin
 #define GYRO_CS_GPIO_Port Chip_Select_GPIO_Port
@@ -135,33 +105,6 @@ typedef struct {
 } EncoderData;
 /* Units: distance in mm, velocity in mm/s, acceleration in mm/s^2, jerk in mm/s^3 */
 
-typedef struct {
-    /* Inputs (possibly adjusted internally for feasibility) */
-    float distance_mm;
-    float vmax;     // desired max vel
-    float amax;     // max accel (may be reduced if segment is very short)
-    float jmax;     // max jerk  (positive magnitude)
-
-    /* Derived segment times (s): 7-segment jerk-limited profile */
-    float tj;       // jerk-up / jerk-down duration
-    float ta;       // constant acceleration duration (per half)
-    float tv;       // constant velocity (cruise) duration
-
-    /* State */
-    float t_elapsed;      // s
-    float t_total;        // s
-    float s;              // mm (integrated position)
-    float v;              // mm/s
-    float a;              // mm/s^2
-    float j;              // mm/s^3 (current commanded jerk)
-    int   phase;          // 1..7
-    bool  complete;
-
-    /* Timing */
-    uint32_t last_update_ms;
-} SCurveProfile;
-
-
 
 /* Global variables */
 extern MazeCell maze[MAZE_SIZE][MAZE_SIZE];
@@ -188,23 +131,7 @@ extern const int dy[4];
 /* Goal positions */
 extern const int goal_x1, goal_y1, goal_x2, goal_y2;
 
-/* Core micromouse functions */
-void championship_micromouse_init(void);
-void initialize_championship_maze(void);
-void championship_exploration_with_analysis(void);
-void execute_championship_path_analysis(void);
-void reset_championship_micromouse(void);
-void championship_speed_run(void);
 
-/* Core maze algorithm functions */
-void championship_flood_fill(void);
-int get_championship_direction(void);
-void championship_update_walls(void);
-void turn_to_direction(int target_dir);
-bool championship_move_forward(void);
-bool is_at_goal(void);
-float get_exploration_efficiency(void);
-int get_optimal_distance(void);
 
 /* Movement functions */
 void start_encoders(void);
@@ -214,31 +141,55 @@ void turn_right(void);
 void turn_around(void);
 void stop_motors(void);
 void break_motors(void);
-void move_forward_distance(int distance_mm);
-void move_forward_adaptive_speed(float speed_multiplier);
-void motor_set(uint16_t ch_pwm, GPIO_TypeDef *dirPort, uint16_t dirPin, bool forward, uint16_t duty);
+void move_forward_distance(int target_counts);
 void test_motors_individual(void);
-void motor_set_fixed(uint8_t motor, bool forward, uint16_t duty);
+void motor_set(uint8_t motor, bool forward, uint16_t duty);
 void moveStraightPID(int base_pwm, bool left_forward, bool right_forward);
 void moveStraightPID_Reset(void);
 void moveStraightGyroPID(void);
 void moveStraightGyroPID_Reset(void);
 void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms);
 
+void fusion_step(int base_pwm);
+void fusion_reset(void);
+void fusion_set_heading_ref_to_current(void);
+void wall_follow_reset_int(int mode, int base_pwm);
+void wall_follow_step(void);
+
+
+
+
 /* logging _tests */
 void run_gyro_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms, uint32_t sample_ms, uint32_t total_ms);
 void run_encoder_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms, uint32_t sample_ms, uint32_t total_ms);
 void run_gyro_turn_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms,uint32_t sample_ms, uint32_t total_ms);
+void run_wall_lateral_step_test(int base_pwm, int delta_pwm,uint32_t step_delay_ms, uint32_t step_duration_ms,uint32_t sample_ms, uint32_t total_ms);
+void run_wall_single_left_step_test(int base_pwm, int delta_pwm,uint32_t step_delay_ms, uint32_t step_duration_ms,uint32_t sample_ms, uint32_t total_ms);
 
 /* Sensor functions */
 void calibrate_sensors(void);
 void update_sensors(void);
 void update_walls(void);
-void turn_on_emitters(void);
-void turn_off_emitters(void);
 uint16_t read_adc_channel(uint32_t channel);
 bool are_sensors_healthy(void);
 void adc_system_diagnostics(void);
+
+static uint32_t dwt_cycles_per_us;
+void dwt_delay_init(uint32_t cpu_hz);
+
+void dwt_delay_us(uint32_t us);
+
+extern int point;
+
+extern uint32_t FL_buff[5];
+extern uint32_t FR_buff[5];
+extern uint32_t L_buff[5];
+extern uint32_t R_buff[5];
+
+#define NOMINAL 1000L
+
+
+
 
 uint16_t get_calibrated_threshold(int sensor_index);
 bool is_sensor_calibration_valid(void);
@@ -278,7 +229,7 @@ void send_sensor_data(void);
 void send_position_data(void);
 void send_performance_metrics(void);
 void send_battery_status(void);
-void send_championship_stats(void);
+void send_stats(void);
 
 /* Utility functions */
 void delay_ms(uint32_t ms);
@@ -300,17 +251,6 @@ bool system_health_check(void);
 void performance_start_timer(void);
 void performance_end_timer(const char* operation_name);
 
-/* Championship analysis functions */
-void calculate_optimal_path_from_explored_areas(void);
-void analyze_championship_maze_performance(void);
-void print_championship_distance_map(void);
-void visualize_championship_optimal_path(void);
-void show_championship_distances(void);
-
-/* Speed run functions */
-void speed_run(void);
-bool is_speed_run_ready(void);
-int get_speed_run_optimal_distance(void);
 
 /*GPIO External Interrupt Callback*/
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
@@ -318,35 +258,141 @@ void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
 void verify_adc_gpio_configuration(void);
 void calibrate_adc(void);
 
-void move_forward_adaptive_speed(float speed_multiplier);
-bool is_speed_run_ready(void);
-int get_speed_run_optimal_distance(void);
+
 bool mpu9250_is_initialized(void);
 void mpu9250_send_status(void);
 void send_encoder_status(void);
-
 
 void debug_encoder_setup(void);
 void test_encoder_manual(void);
 void test_encoder_rotation(void);
 
-/* Enhanced movement functions with Trapezoidal -curve */
-void move_forward_with_profile(float distance_mm, float max_speed);
-void move_forward_smooth(float distance_mm);
 
-// Enhanced S-curve movement functions
-void move_forward_scurve(float distance_mm, float speed_multiplier);
-bool championship_move_forward_enhanced(void);
-void set_heading_pid_gains(float kp, float ki, float kd);
-void get_heading_pid_status(void);
-void test_scurve_movement(void);
 /* Encoder safe API */
 void update_encoder_totals(void);
 int32_t get_left_encoder_total(void);
 int32_t get_right_encoder_total(void);
 void reset_encoder_totals(void);
 
-/* Test helper used from main/test harness (if present) */
-void test_scurve_single_cell(void);
+// Wall following mode enumeration
+typedef enum {
+    WALL_FOLLOW_NONE = 0,    // Gyro only, no wall following
+    WALL_FOLLOW_LEFT = 1,    // Follow left wall only
+    WALL_FOLLOW_RIGHT = 2,   // Follow right wall only
+    WALL_FOLLOW_BOTH = 3     // Follow both walls (stay centered)
+} WallFollowMode_t;
+
+// New function declarations
+void wallFollowPID_Reset(void);
+void moveStraightSensorFusion(int base_pwm, WallFollowMode_t wall_mode);
+void move_forward_distance_fusion(int target_counts, WallFollowMode_t wall_mode);
+
+
+
+/* Function declarations */
+
+/**
+ * @brief Initialize maze for exploration
+ * Sets up the maze data structure, boundary walls, center coordinates,
+ * and robot starting position
+ */
+void initialize_maze_exploration(void);
+
+/**
+ * @brief Run flood fill algorithm
+ * Calculates distance values from goal to all reachable cells
+ * Updates the distance field in the maze structure
+ */
+void flood_fill_algorithm(void);
+
+/**
+ * @brief Get best direction to move based on current position
+ * Uses flood fill values, visit counts, and direction priorities
+ * to determine optimal next move
+ *
+ * @return Direction (NORTH, EAST, SOUTH, WEST)
+ */
+int get_best_direction(void);
+
+/**
+ * @brief Turn robot to face specified direction
+ * Handles all turning logic (left, right, around)
+ * Updates robot direction state
+ *
+ * @param target_direction Target direction to face
+ */
+void turn_to_direction(int target_direction);
+
+/**
+ * @brief Move forward one cell with precise control
+ * Uses moveStraightGyroPID for accurate movement
+ * Updates robot position and maze visit counts
+ *
+ * @return true if movement successful, false if blocked
+ */
+bool move_forward_one_cell(void);
+
+/**
+ * @brief Check if robot is at current goal position
+ * Goal changes based on exploration phase (center vs start)
+ *
+ * @return true if at goal, false otherwise
+ */
+bool is_at_goal(void);
+
+/**
+ * @brief Update maze wall information from sensor readings
+ * Reads sensors and updates wall information for current cell
+ * Also updates opposite walls in adjacent cells
+ */
+void update_maze_walls(void);
+
+/**
+ * @brief Main maze exploration function
+ * Implements the complete exploration algorithm:
+ * - Sensor reading and wall detection
+ * - Flood fill calculation
+ * - Direction selection
+ * - Movement execution
+ * - Goal detection
+ */
+void explore_maze(void);
+
+/**
+ * @brief Run complete maze exploration sequence
+ * Handles both phases:
+ * 1. Exploration to center
+ * 2. Return to start
+ *
+ * Provides comprehensive status reporting and telemetry
+ */
+void run_maze_exploration_sequence(void);
+
+/**
+ * @brief Check if exploration is complete
+ * Returns true when both center_reached and returned_to_start are true
+ *
+ * @return true if exploration complete, false otherwise
+ */
+bool is_exploration_complete(void);
+
+/**
+ * @brief Calculate exploration efficiency
+ * Compares actual steps taken to theoretical minimum
+ *
+ * @return Efficiency percentage (0-100%)
+ */
+float get_exploration_efficiency(void);
+
+/**
+ * @brief Get optimal distance for current maze knowledge
+ * Calculates shortest known path distance
+ *
+ * @return Optimal distance in steps
+ */
+int get_optimal_distance(void);
+
+
+
 
 #endif /* MICROMOUSE_H */

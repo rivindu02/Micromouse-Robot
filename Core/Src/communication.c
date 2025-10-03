@@ -88,8 +88,8 @@ void send_position_data(void)
  */
 void send_performance_metrics(void)
 {
-    float efficiency = get_exploration_efficiency();
-    int optimal_distance = get_optimal_distance();
+    float efficiency = get_exploration_efficiency();  // make functions
+    int optimal_distance = get_optimal_distance();		// make functions
 
     send_bluetooth_message("\r\n=== PERFORMANCE METRICS ===\r\n");
     send_bluetooth_printf("Exploration Steps: %d\r\n", robot.exploration_steps);
@@ -98,7 +98,7 @@ void send_performance_metrics(void)
 
     // Performance rating
     if (efficiency <= 50.0f && optimal_distance > 0) {
-        send_bluetooth_message("Rating: ⭐⭐⭐⭐⭐ CHAMPIONSHIP LEVEL\r\n");
+        send_bluetooth_message("Rating: ⭐⭐⭐⭐⭐ LEVEL\r\n");
     } else if (efficiency <= 65.0f) {
         send_bluetooth_message("Rating: ⭐⭐⭐⭐ COMPETITION READY\r\n");
     } else if (efficiency <= 80.0f) {
@@ -127,12 +127,12 @@ void send_battery_status(void)
 }
 
 /**
- * @brief Send championship statistics
+ * @brief Send  statistics
  */
-void send_championship_stats(void)
+void send_stats(void)
 {
-    send_bluetooth_message("\r\n🏆 CHAMPIONSHIP STATISTICS 🏆\r\n");
-    send_bluetooth_printf("Algorithm: Flood Fill + Championship Heuristics\r\n");
+    send_bluetooth_message("\r\n🏆 STATISTICS 🏆\r\n");
+    send_bluetooth_printf("Algorithm: Flood Fill +  Heuristics\r\n");
     send_bluetooth_printf("MCU: STM32F411CEU6 @ 84MHz\r\n");
     send_bluetooth_printf("Sensors: 4x TEFT4300 IR + MPU9250 Gyro\r\n");
     send_bluetooth_printf("Motors: DRV8833 H-Bridge with Encoders\r\n");

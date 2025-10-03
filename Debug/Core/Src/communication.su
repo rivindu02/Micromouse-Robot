@@ -5,4 +5,4 @@
 ../Core/Src/communication.c:77:6:send_position_data	24	static
 ../Core/Src/communication.c:89:6:send_performance_metrics	16	static
 ../Core/Src/communication.c:115:6:send_battery_status	24	static
-../Core/Src/communication.c:132:6:send_championship_stats	8	static
+../Core/Src/communication.c:132:6:send_stats	8	static
