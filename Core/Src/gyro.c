@@ -33,7 +33,7 @@ static bool mpu9250_initialized = false;
 
 // Enhanced gyro state structure
 typedef struct {
-    float gyro_bias_x, gyro_bias_y, gyro_bias_z;
+    float gyro_bias_z;
     bool calibrated;
     uint32_t calibration_samples;
 } EnhancedGyroState;
@@ -160,24 +160,26 @@ void mpu9250_calibrate_bias(void) {
 
     send_bluetooth_message("Calibrating gyro bias... Keep robot stationary!\r\n");
 
-    enhanced_gyro.calibration_samples = 1000;
-    float sum_x = 0, sum_y = 0, sum_z = 0;
+    enhanced_gyro.calibration_samples = 100;
+    //float sum_x = 0, sum_y = 0, sum_z = 0;
+    float sum_z = 0;
 
     for(int i = 0; i < enhanced_gyro.calibration_samples; i++) {
         mpu9250_read_gyro();
-        sum_x += gyro.gyro_x;
-        sum_y += gyro.gyro_y;
+        //sum_x += gyro.gyro_x;
+        //sum_y += gyro.gyro_y;
         sum_z += gyro.gyro_z;
         HAL_Delay(3); // 333Hz sampling for stable bias
     }
 
-    enhanced_gyro.gyro_bias_x = sum_x / enhanced_gyro.calibration_samples;
-    enhanced_gyro.gyro_bias_y = sum_y / enhanced_gyro.calibration_samples;
+    //enhanced_gyro.gyro_bias_x = sum_x / enhanced_gyro.calibration_samples;
+    //enhanced_gyro.gyro_bias_y = sum_y / enhanced_gyro.calibration_samples;
     enhanced_gyro.gyro_bias_z = sum_z / enhanced_gyro.calibration_samples;
     enhanced_gyro.calibrated = true;
 
-    send_bluetooth_printf("Gyro bias calibrated: X:%.1f Y:%.1f Z:%.1f\r\n",
-                         enhanced_gyro.gyro_bias_x, enhanced_gyro.gyro_bias_y, enhanced_gyro.gyro_bias_z);
+//    send_bluetooth_printf("Gyro bias calibrated: X:%.1f Y:%.1f Z:%.1f\r\n",
+//                         enhanced_gyro.gyro_bias_x, enhanced_gyro.gyro_bias_y, enhanced_gyro.gyro_bias_z);
+    send_bluetooth_printf("Gyro bias calibrated: Z:%.1f\r\n", enhanced_gyro.gyro_bias_z);
 }
 
 /**
@@ -235,8 +237,8 @@ void mpu9250_read_gyro(void)
     }
 
     // Convert to signed 16-bit values
-    gyro.gyro_x = (int16_t)((raw_data[0] << 8) | raw_data[1]);
-    gyro.gyro_y = (int16_t)((raw_data[2] << 8) | raw_data[3]);
+    //gyro.gyro_x = (int16_t)((raw_data[0] << 8) | raw_data[1]);
+    //gyro.gyro_y = (int16_t)((raw_data[2] << 8) | raw_data[3]);
     gyro.gyro_z = (int16_t)((raw_data[4] << 8) | raw_data[5]);
 }
 
@@ -337,10 +339,11 @@ void mpu9250_send_status(void)
 
         // Read current sensor values
         mpu9250_read_all();
-        send_bluetooth_printf("Gyro X:%d Y:%d Z:%.1f°/s\r\n",
-                             gyro.gyro_x, gyro.gyro_y, mpu9250_get_gyro_z_dps());
+//        send_bluetooth_printf("Gyro X:%d Y:%d Z:%.1f°/s\r\n",
+//                             gyro.gyro_x, gyro.gyro_y, mpu9250_get_gyro_z_dps());
         send_bluetooth_printf("Accel X:%d Y:%d Z:%d\r\n",
                              gyro.accel_x, gyro.accel_y, gyro.accel_z);
+        send_bluetooth_printf("Gyro Z:%.1f°/s\r\n",mpu9250_get_gyro_z_dps());
     }
 }
 

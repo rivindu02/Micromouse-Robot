@@ -186,39 +186,53 @@ void run_encoder_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, 
 }
 
 
+// --- Gyro rate step test: logs signed cmds for identification ---
 void run_gyro_turn_step_test(int base_pwm, int delta_pwm,
                              uint32_t step_delay_ms, uint32_t step_duration_ms,
                              uint32_t sample_ms, uint32_t total_ms)
 {
-    send_bluetooth_printf("t_ms,Lpwm,Rpwm,gz,left_cnt,right_cnt\r\n");
+    // Python expects this exact header:
+    send_bluetooth_printf("t_ms,left_cmd,right_cmd,gyro_z,left_cnt,right_cnt\r\n");
 
     uint32_t t0 = HAL_GetTick();
     uint32_t next_sample = t0;
-    start_encoders();
+
+    start_encoders();  // your encoder init :contentReference[oaicite:0]{index=0}
+
+    // simple clamp
+    #define CLAMPi(v,lo,hi) ((v)<(lo)?(lo):((v)>(hi)?(hi):(v)))
 
     while ((HAL_GetTick() - t0) <= total_ms) {
-        uint32_t now = HAL_GetTick();
+        uint32_t now   = HAL_GetTick();
         uint32_t t_rel = now - t0;
 
-        int lpwm = base_pwm;
-        int rpwm = base_pwm;
+        int left_cmd  = 0;   // signed: +forward, -backward
+        int right_cmd = 0;
 
         if (t_rel >= step_delay_ms && t_rel < (step_delay_ms + step_duration_ms)) {
-            lpwm = clampf(base_pwm - delta_pwm, 0, 1000);
-            rpwm = clampf(base_pwm + delta_pwm, 0, 1000);
+            // differential step to excite yaw (left back, right fwd)
+            int lpwm = CLAMPi(base_pwm - delta_pwm, 0, 1000);
+            int rpwm = CLAMPi(base_pwm + delta_pwm, 0, 1000);
+
+            left_cmd  = -lpwm;                // backward => negative
+            right_cmd = +rpwm;                // forward  => positive
+
+            motor_set(0, /*forward=*/false, (uint16_t)lpwm);  // Left backward :contentReference[oaicite:1]{index=1}
+            motor_set(1, /*forward=*/true,  (uint16_t)rpwm);  // Right forward :contentReference[oaicite:2]{index=2}
+        } else {
+            motor_set(0, true, 0);
+            motor_set(1, true, 0);
         }
 
-        mpu9250_read_gyro();
-        // in-place turn: left backward, right forward
-        motor_set(0, false, lpwm);
-        motor_set(1, true,  rpwm);
+        mpu9250_read_gyro();                                     // update gyro
+        float gz = mpu9250_get_gyro_z_compensated();             // deg/s
 
         if (now >= next_sample) {
-            float gz = mpu9250_get_gyro_z_compensated();
-            int32_t lc = get_left_encoder_total();
-            int32_t rc = get_right_encoder_total();
+            int32_t lc = get_left_encoder_total();               // :contentReference[oaicite:3]{index=3}
+            int32_t rc = get_right_encoder_total();              // :contentReference[oaicite:4]{index=4}
             send_bluetooth_printf("%lu,%d,%d,%.3f,%ld,%ld\r\n",
-                                  (unsigned long)t_rel, lpwm, rpwm, gz,
+                                  (unsigned long)t_rel,
+                                  left_cmd, right_cmd, gz,
                                   (long)lc, (long)rc);
             next_sample += sample_ms;
         }
@@ -226,7 +240,7 @@ void run_gyro_turn_step_test(int base_pwm, int delta_pwm,
         HAL_Delay(1);
     }
 
-    stop_motors();
+    stop_motors();                                               // :contentReference[oaicite:5]{index=5}
     send_bluetooth_printf("#DONE gyro step test\r\n");
 }
 

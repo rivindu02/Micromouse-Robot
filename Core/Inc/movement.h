@@ -25,8 +25,4 @@ void test_encoder_rotation(void);
 
 
 
-// New function declarations
-void wallFollowPID_Reset(void);
-void moveStraightSensorFusion(int base_pwm, WallFollowMode_t wall_mode);
-void move_forward_distance_fusion(int target_counts, WallFollowMode_t wall_mode);
 #endif

@@ -3,6 +3,6 @@
 ../Core/Src/logging_tests.c:52:19:clampi	2
 ../Core/Src/logging_tests.c:60:6:run_gyro_step_test	7
 ../Core/Src/logging_tests.c:128:6:run_encoder_step_test	7
-../Core/Src/logging_tests.c:189:6:run_gyro_turn_step_test	5
-../Core/Src/logging_tests.c:235:6:run_wall_lateral_step_test	5
-../Core/Src/logging_tests.c:297:6:run_wall_single_left_step_test	10
+../Core/Src/logging_tests.c:190:6:run_gyro_turn_step_test	7
+../Core/Src/logging_tests.c:249:6:run_wall_lateral_step_test	5
+../Core/Src/logging_tests.c:311:6:run_wall_single_left_step_test	10

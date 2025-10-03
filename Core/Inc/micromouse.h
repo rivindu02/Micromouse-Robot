@@ -150,6 +150,8 @@ void moveStraightGyroPID(void);
 void moveStraightGyroPID_Reset(void);
 void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms);
 
+
+/* Wall Handle Functions */
 void fusion_step(int base_pwm);
 void fusion_reset(void);
 void fusion_set_heading_ref_to_current(void);
@@ -174,7 +176,7 @@ uint16_t read_adc_channel(uint32_t channel);
 bool are_sensors_healthy(void);
 void adc_system_diagnostics(void);
 
-static uint32_t dwt_cycles_per_us;
+//static uint32_t dwt_cycles_per_us;
 void dwt_delay_init(uint32_t cpu_hz);
 
 void dwt_delay_us(uint32_t us);

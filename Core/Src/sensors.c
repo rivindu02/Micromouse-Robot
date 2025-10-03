@@ -739,8 +739,6 @@ void diagnostic_sensor_test(void) {
 
 
 
-
-
 //void update_sensors3(void)
 //{
 //    uint32_t ch[4]    = {ADC_CHANNEL_5, ADC_CHANNEL_2, ADC_CHANNEL_4, ADC_CHANNEL_3};

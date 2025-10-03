@@ -319,21 +319,29 @@ int main(void)
 //  run_gyro_step_test(600, 200, 1000, 2000, 5, 7000);   // check base dependence
 //  HAL_Delay(1500);
 //  run_gyro_step_test(800, 200, 1000, 2000, 5, 7000);
+//
+//  run_gyro_turn_step_test(/*base_pwm=*/700,
+//                          /*delta_pwm=*/120,
+//                          /*step_delay_ms=*/1000,
+//                          /*step_duration_ms=*/1500,
+//                          /*sample_ms=*/5,
+//                          /*total_ms=*/3500);
+
 
 
    //use gyro PID/////////////////////////////////////////////////////////////
-  moveStraightGyroPID_Reset();
-  //moveStraightPID_Reset();
-  int left=0;
-  int right=0;
-  while(left*(-1)<=2555 || right*(-1)<=2539){
-	  mpu9250_read_gyro();
-	  left=get_left_encoder_total();
-	  right=get_right_encoder_total();
-	  moveStraightGyroPID();
-	  //send_bluetooth_printf("L:%ld R:%ld\r\n",left,right);
-  }
-  break_motors();
+//  moveStraightGyroPID_Reset();
+//  //moveStraightPID_Reset();
+//  int left=0;
+//  int right=0;
+//  while(left*(-1)<=2555 || right*(-1)<=2539){
+//	  mpu9250_read_gyro();
+//	  left=get_left_encoder_total();
+//	  right=get_right_encoder_total();
+//	  moveStraightGyroPID();
+//	  //send_bluetooth_printf("L:%ld R:%ld\r\n",left,right);
+//  }
+//  break_motors();
 
 
   // Sensor Fusion///////////////////////////////////////////////////////////////////////
@@ -397,6 +405,8 @@ int main(void)
   //      /*base_pwm=*/500,   /*delta_pwm=*/150,
   //      /*step_delay_ms=*/1000, /*step_duration_ms=*/2000,
   //      /*sample_ms=*/10,   /*total_ms=*/6000);
+
+  turn_left();
 
 
 
