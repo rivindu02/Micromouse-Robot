@@ -22,6 +22,7 @@ void update_encoder_totals(void);
 void debug_encoder_setup(void);
 void test_encoder_manual(void);
 void test_encoder_rotation(void);
+void gyro_turn_reset(void);
 
 
 

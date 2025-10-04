@@ -158,11 +158,11 @@ static int   WF_BASE_PWM        = 500;     // cruise PWM
 static int   WF_PWM_MIN_MOVE    = 50;      // overcome stiction
 static int   WF_PWM_MAX         = 1000;    // clamp
 
-//Kp=0.003115  Ki=0.001479  Kd=0.270515
-static float WF_KP = 1.0f;
-static float WF_KI = 0.0f;   // integral uses e_int += e * dt  (dt in seconds)
-static float WF_KD = 0.0f;   // derivative uses d = Δe / dt
-static float WF_DERIV_ALPHA     = 0.85f;   // derivative low-pass (0..1)
+// PID gains (your tuned values)
+static float WF_KP = 0.05f;
+static float WF_KI = 0.0f;
+static float WF_KD = 0.0f;
+static float WF_DERIV_ALPHA     = 0.85f;   // derivative low-pass filter (0..1) //0.35 in Praveen's
 static float WF_INT_LIMIT       = 250.0f;  // anti-windup clamp
 static float WF_SINGLE_ALPHA    = 0.03f;   // EMA for single-wall target tracking
 static float WF_BOTH_SCALE      = 1.0f;   // overall aggressiveness when both walls seen
@@ -173,6 +173,34 @@ static bool  WF_BRAKE_ON_FRONT  = true;
 static int   WF_SLOW_PWM        = 380;     // slow when front wall seen
 static uint8_t WF_FRONT_HOLD_MS = 120;     // brief brake pulse before stop (if you enable braking)
 
+// ---------- Lookup Tables ----------
+// Right sensor LUT
+#define R_LUT_SIZE 33
+static const int   right_adc[R_LUT_SIZE]   = {43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11};
+static const float right_dist[R_LUT_SIZE]  = {1.17,1.23,1.29,1.36,1.43,1.51,1.59,1.67,1.76,1.85,1.95,2.05,2.16,2.28,2.40,2.53,2.67,2.82,2.98,3.16,3.34,3.55,3.76,4.00,4.26,4.54,4.85,5.19,5.57,5.98,6.45,6.96};
+
+// Left sensor LUT
+#define L_LUT_SIZE 32
+static const int   left_adc[L_LUT_SIZE]    = {42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11};
+static const float left_dist[L_LUT_SIZE]   = {1.17f,1.23f,1.29f,1.36f,1.43f,1.51f,1.59f,1.67f,1.76f,1.85f,1.95f,2.05f,2.16f,2.28f,2.40f,2.53f,2.67f,2.82f,2.98f,3.16f,3.34f,3.55f,3.76f,4.00f,4.26f,4.54f,4.85f,5.19f,5.57f,5.98f,6.45f,6.96f};
+
+// ---------- Helper: Linear interpolation lookup ----------
+static float lut_lookup(int raw, const int *adc_table, const float *dist_table, int size)
+{
+    // Clamp below/above table
+    if (raw >= adc_table[0]) return dist_table[0];
+    if (raw <= adc_table[size-1]) return dist_table[size-1];
+
+    // Find interval [i, i+1] where raw fits
+    for (int i=0; i<size-1; i++) {
+        if (raw <= adc_table[i] && raw >= adc_table[i+1]) {
+            float t = (float)(raw - adc_table[i+1]) / (float)(adc_table[i] - adc_table[i+1]);
+            return dist_table[i+1] + t * (dist_table[i] - dist_table[i+1]);
+        }
+    }
+    return (float)raw; // fallback (should not happen)
+}
+
 
 // ---------- Internal state ----------
 typedef enum { WF_AUTO=0, WF_LEFT, WF_RIGHT } wf_mode_t;
@@ -181,8 +209,8 @@ static wf_mode_t wf_mode = WF_AUTO;
 static float e_int = 0.0f, e_prev = 0.0f, d_filt = 0.0f;
 static uint32_t wf_last_ms = 0;
 
-static float target_left  = 23.0f;  // learned sensor targets for single-wall
-static float target_right = 25.0f;
+static float target_left  = 5.0f;   // desired left wall distance (cm)
+static float target_right = 5.0f;   // desired right wall distance (cm)
 
 static inline int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 static inline float clampf(float v, float lo, float hi){ return v < lo ? lo : (v > hi ? hi : v); }
@@ -235,22 +263,23 @@ void wall_follow_step(void)
     float e = 0.0f;
 
     if (Lw && Rw) {
-        float L = (float)sensors.side_left;
-        float R = (float)sensors.side_right;
-        e = WF_BOTH_SCALE * (logf(L + 1.0f) - logf(R + 1.0f));
+    	// Both walls: balance distances
+    	float L = lut_lookup(sensors.side_left,  left_adc,  left_dist,  L_LUT_SIZE);
+    	float R = lut_lookup(sensors.side_right, right_adc, right_dist, R_LUT_SIZE);
+    	e = WF_BOTH_SCALE * (L - R);
         // keep single-wall targets gently aligned to present gap
         //target_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*L;
         //target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*R;
 
     } else if (Lw) {
-        float L = (float)sensors.side_left;
-        //arget_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*L;
-        e = logf(L + 1.0f) - logf(target_left + 1.0f);
+    	// Left wall only: hold target distance
+    	float L = lut_lookup(sensors.side_left, left_adc, left_dist, L_LUT_SIZE);
+    	e = target_left - L;
 
     } else if (Rw) {
-        float R = (float)sensors.side_right;
-        //target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*R;
-        e = logf(target_right + 1.0f) - logf(R + 1.0f);
+    	// Right wall only: hold target distance
+    	float R = lut_lookup(sensors.side_right, right_adc, right_dist, R_LUT_SIZE);
+    	e = R - target_right;
 
     } else {
         // No side walls -> no correction (let heading/gyro PID handle straightness if you run it)

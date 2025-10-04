@@ -358,17 +358,17 @@ int main(void)
 
 
   // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
-//  int mode = 0;               // WF_AUTO
-//  int base_pwm = 570;         // use the speed you tuned at
-//
-//  // bootstrap targets & reset integrators
-//  wall_follow_reset_int(mode, base_pwm);
-//
-//  while (1) {
-//      wall_follow_step();     // computes e, PID, sets motor PWMs
-//      //HAL_Delay(2);           // keep a steady loop
-//      dwt_delay_us(50);
-//  }
+  int mode = 0;               // WF_AUTO
+  int base_pwm = 570;         // use the speed you tuned at
+
+  // bootstrap targets & reset integrators
+  wall_follow_reset_int(mode, base_pwm);
+
+  while (1) {
+      wall_follow_step();     // computes e, PID, sets motor PWMs
+      //HAL_Delay(2);           // keep a steady loop
+      dwt_delay_us(50);
+  }
 
 
 

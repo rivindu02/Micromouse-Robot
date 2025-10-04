@@ -91,9 +91,27 @@ void start_encoders(void) {
 
 extern bool align_front_to_wall(int base_pwm, uint32_t timeout_ms);
 
+#define S_CURVE_LUT_LEN 51
+#define S_CURVE_LUT_STEP_COUNTS 10
+#define S_CURVE_LUT_SPAN_COUNTS 500
+#define S_CURVE_LUT_BASE_PWM 700
+#define S_CURVE_LUT_MIN_PWM 350
+extern void dwt_delay_us(uint32_t us);
+
+static const int16_t S_CURVE_LUT[S_CURVE_LUT_LEN] = {
+    700, 700, 700, 699, 698, 697, 695, 692, 689, 685, 680, 674, 667, 660, 652, 643, 633, 623, 612, 601, 589, 577, 564, 551, 538, 525, 512, 499, 486, 473, 461, 449, 438, 427, 417, 407, 398, 390, 383, 376, 370, 365, 361, 358, 355, 353, 352, 351, 350, 350, 350
+};
+
 void turn_left(void) {
+
     // turn 90 degrees left using gyro PID, 1200 ms timeout for safety
-    align_front_to_wall(700,1500);
+	if (sensors.wall_front){
+		align_front_to_wall(700,1500);
+	}else{
+		dwt_delay_us(100);
+
+
+	}
     gyro_turn_reset();
     turn_in_place_gyro(+90.0f, 520, 1200);
     robot.direction = (robot.direction + 3) % 4;
@@ -101,6 +119,7 @@ void turn_left(void) {
 }
 
 void turn_right(void) {
+	if (sensors.wall_front)	align_front_to_wall(700,1500);
     turn_in_place_gyro(-90.0f, 520, 1200);
     robot.direction = (robot.direction + 1) % 4;
 }
