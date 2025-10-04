@@ -17,7 +17,7 @@
 #include <math.h>    // For fabsf(), sqrtf()
 
 /* Maze configuration */
-#define MAZE_SIZE 16
+#define MAZE_SIZE 12
 #define MAX_DISTANCE 9999
 #define CELL_SIZE_MM 180.0f
 
@@ -28,21 +28,22 @@
 #define WEST 3
 
 /* Movement parameters */
-#define BASE_SPEED 150
-#define TURN_SPEED 100
-#define MAX_SPEED 255
-#define ENCODER_COUNTS_PER_CELL 1461		// Updated
+
+#define LEFT_ENCODER_COUNTS_PER_CELL 2555		// Updated
+#define RIGHT_ENCODER_COUNTS_PER_CELL 2539
 #define ENCODER_COUNTS_PER_TURN 500
 
 /* Sensor thresholds */
-#define WALL_THRESHOLD_FRONT 50   //2000
-#define WALL_THRESHOLD_SIDE 20      //1500
+#define WALL_THRESHOLD_FRONT_L 6   //2000
+#define WALL_THRESHOLD_FRONT_R 6
+#define WALL_THRESHOLD_SIDE_L 15      //1500
+#define WALL_THRESHOLD_SIDE_R 15
 #define BATTERY_LOW_THRESHOLD 3000
 #define IR_AMBIENT_THRESHOLD 500
 
 /*To move the encoder while stopped*/
-#define PWM_MIN_MOVE_LEFT   500
-#define PWM_MIN_MOVE_RIGHT  500
+#define PWM_MIN_MOVE_LEFT   450
+#define PWM_MIN_MOVE_RIGHT  450
 
 
 /* Audio frequencies (Hz) */
@@ -141,7 +142,7 @@ void turn_right(void);
 void turn_around(void);
 void stop_motors(void);
 void break_motors(void);
-void move_forward_distance(int target_counts);
+void move_forward_distance(int Left_target_counts,int Right_target_counts);
 void test_motors_individual(void);
 void motor_set(uint8_t motor, bool forward, uint16_t duty);
 void moveStraightPID(int base_pwm, bool left_forward, bool right_forward);

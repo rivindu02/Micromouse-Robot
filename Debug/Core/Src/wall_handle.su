@@ -5,6 +5,6 @@
 ../Core/Src/wall_handle.c:216:21:clampf	24	static
 ../Core/Src/wall_handle.c:223:6:wall_follow_reset_int	16	static
 ../Core/Src/wall_handle.c:238:6:wall_follow_step	64	static
-../Core/Src/wall_handle.c:358:6:fusion_reset	8	static
-../Core/Src/wall_handle.c:379:6:fusion_set_heading_ref_to_current	4	static
-../Core/Src/wall_handle.c:385:6:fusion_step	112	static
+../Core/Src/wall_handle.c:359:6:fusion_reset	8	static
+../Core/Src/wall_handle.c:380:6:fusion_set_heading_ref_to_current	4	static
+../Core/Src/wall_handle.c:386:6:fusion_step	112	static

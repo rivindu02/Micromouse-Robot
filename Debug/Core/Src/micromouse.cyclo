@@ -9,10 +9,10 @@
 ../Core/Src/micromouse.c:194:5:get_best_direction	22
 ../Core/Src/micromouse.c:262:6:turn_to_direction	4
 ../Core/Src/micromouse.c:296:6:move_forward_one_cell	5
-../Core/Src/micromouse.c:332:6:is_at_goal	8
-../Core/Src/micromouse.c:346:6:update_maze_walls	22
-../Core/Src/micromouse.c:397:6:explore_maze	11
-../Core/Src/micromouse.c:476:6:run_maze_exploration_sequence	8
-../Core/Src/micromouse.c:524:6:is_exploration_complete	1
-../Core/Src/micromouse.c:531:7:get_exploration_efficiency	3
-../Core/Src/micromouse.c:547:5:get_optimal_distance	1
+../Core/Src/micromouse.c:330:6:is_at_goal	8
+../Core/Src/micromouse.c:344:6:update_maze_walls	22
+../Core/Src/micromouse.c:395:6:explore_maze	11
+../Core/Src/micromouse.c:474:6:run_maze_exploration_sequence	8
+../Core/Src/micromouse.c:522:6:is_exploration_complete	1
+../Core/Src/micromouse.c:529:7:get_exploration_efficiency	3
+../Core/Src/micromouse.c:545:5:get_optimal_distance	1

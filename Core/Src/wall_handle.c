@@ -159,9 +159,9 @@ static int   WF_PWM_MIN_MOVE    = 50;      // overcome stiction
 static int   WF_PWM_MAX         = 1000;    // clamp
 
 // PID gains (your tuned values)
-static float WF_KP = 0.05f;
+static float WF_KP = 0.25f;
 static float WF_KI = 0.0f;
-static float WF_KD = 0.0f;
+static float WF_KD = 0.004f;
 static float WF_DERIV_ALPHA     = 0.85f;   // derivative low-pass filter (0..1) //0.35 in Praveen's
 static float WF_INT_LIMIT       = 250.0f;  // anti-windup clamp
 static float WF_SINGLE_ALPHA    = 0.03f;   // EMA for single-wall target tracking
@@ -209,8 +209,8 @@ static wf_mode_t wf_mode = WF_AUTO;
 static float e_int = 0.0f, e_prev = 0.0f, d_filt = 0.0f;
 static uint32_t wf_last_ms = 0;
 
-static float target_left  = 5.0f;   // desired left wall distance (cm)
-static float target_right = 5.0f;   // desired right wall distance (cm)
+static float target_left  = 2.50f;   // desired left wall distance (cm)
+static float target_right = 2.50f;   // desired right wall distance (cm)
 
 static inline int clampi(int v, int lo, int hi) { return v < lo ? lo : (v > hi ? hi : v); }
 static inline float clampf(float v, float lo, float hi){ return v < lo ? lo : (v > hi ? hi : v); }
@@ -265,8 +265,9 @@ void wall_follow_step(void)
     if (Lw && Rw) {
     	// Both walls: balance distances
     	float L = lut_lookup(sensors.side_left,  left_adc,  left_dist,  L_LUT_SIZE);
-    	float R = lut_lookup(sensors.side_right, right_adc, right_dist, R_LUT_SIZE);
-    	e = WF_BOTH_SCALE * (L - R);
+    	e = target_left - L;
+//    	float R = lut_lookup(sensors.side_right, right_adc, right_dist, R_LUT_SIZE);
+//    	e = WF_BOTH_SCALE * (L - R);
         // keep single-wall targets gently aligned to present gap
         //target_left  = (1.0f - WF_SINGLE_ALPHA)*target_left  + WF_SINGLE_ALPHA*L;
         //target_right = (1.0f - WF_SINGLE_ALPHA)*target_right + WF_SINGLE_ALPHA*R;

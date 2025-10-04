@@ -107,8 +107,9 @@ void turn_left(void) {
     // turn 90 degrees left using gyro PID, 1200 ms timeout for safety
 	if (sensors.wall_front){
 		align_front_to_wall(700,1500);
-	}else{
-		dwt_delay_us(100);
+//	}else{
+//		dwt_delay_us(100);
+//
 
 
 	}
@@ -159,12 +160,13 @@ void break_motors(void)
 /**
  * @brief Move forward a specific distance - FIXED VERSION
  */
-void move_forward_distance(int target_counts) {		// CHECK////////////////////////////////////////
+void move_forward_distance(int Left_target_counts,int Right_target_counts) {		// CHECK////////////////////////////////////////
 
     // FIXED: Use safe encoder reading
 	reset_encoder_totals();
     int32_t start_left = get_left_encoder_total();
     int32_t start_right = get_right_encoder_total();
+    moveStraightGyroPID_Reset();
 
 
     while (1) {
@@ -174,13 +176,13 @@ void move_forward_distance(int target_counts) {		// CHECK///////////////////////
 
         int32_t current_left = get_left_encoder_total();
         int32_t current_right = get_right_encoder_total();
-        int32_t left_traveled = current_left - start_left;
-        int32_t right_traveled = current_right - start_right;
-        int32_t avg_traveled = (left_traveled + right_traveled) / 2;
+        int32_t left_traveled =  start_left-current_left;
+        int32_t right_traveled = start_right-current_right;
+        //int32_t avg_traveled = (left_traveled + right_traveled) / 2;
 
-        send_bluetooth_printf("L:%ld R:%ld\r\n",current_left,current_right);
+        //send_bluetooth_printf("L:%ld R:%ld\r\n",current_left,current_right);
 
-        if (avg_traveled >= target_counts) {
+        if (left_traveled>=Left_target_counts || right_traveled>=Right_target_counts) {
             break;
         }
         HAL_Delay(1);

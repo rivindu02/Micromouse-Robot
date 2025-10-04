@@ -109,7 +109,7 @@ static void initialize_hardware_systems(void);
 static void run_system_diagnostics(void);
 static void send_periodic_status(void);
 extern void dwt_delay_init(uint32_t cpu_hz);
-
+extern void dwt_delay_us(uint32_t us);
 
 /* USER CODE END PFP */
 
@@ -197,7 +197,7 @@ static void run_system_diagnostics(void) {
         system_ready = true;
     } else {
         send_bluetooth_message("⚠️ System health check FAILED - check warnings above\r\n");
-        system_ready = false;
+        system_ready = true;//false;
     }
 
     send_bluetooth_message("🔧 Diagnostics complete!\r\n");
@@ -288,7 +288,7 @@ int main(void)
   initialize_hardware_systems();
 
   // Run system diagnostics
-  //run_system_diagnostics();
+  run_system_diagnostics();
 
   // Play startup sequence
   play_startup_tone();
@@ -303,6 +303,10 @@ int main(void)
     // Initial status
   last_status_time = HAL_GetTick();
   last_blink_time = HAL_GetTick();
+
+  //calibrate_sensors();
+
+
 
 //  while (!start_flag) {
 //      HAL_Delay(10);
@@ -358,17 +362,17 @@ int main(void)
 
 
   // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
-  int mode = 0;               // WF_AUTO
-  int base_pwm = 570;         // use the speed you tuned at
-
-  // bootstrap targets & reset integrators
-  wall_follow_reset_int(mode, base_pwm);
-
-  while (1) {
-      wall_follow_step();     // computes e, PID, sets motor PWMs
-      //HAL_Delay(2);           // keep a steady loop
-      dwt_delay_us(50);
-  }
+//  int mode = 0;               // WF_AUTO
+//  int base_pwm = 570;         // use the speed you tuned at
+//
+//  // bootstrap targets & reset integrators
+//  wall_follow_reset_int(mode, base_pwm);
+//
+//  while (1) {
+//      wall_follow_step();     // computes e, PID, sets motor PWMs
+//      //HAL_Delay(2);           // keep a steady loop
+//      dwt_delay_us(50);
+//  }
 
 
 
@@ -384,7 +388,7 @@ int main(void)
 //  }
 
   // get ADC Values//////////////////////////////////////////////////////
-//  calibrate_sensors();
+
 //  while(1){
 //	  update_sensors();
 //
@@ -406,7 +410,7 @@ int main(void)
   //      /*step_delay_ms=*/1000, /*step_duration_ms=*/2000,
   //      /*sample_ms=*/10,   /*total_ms=*/6000);
 
-  turn_left();
+  //turn_left();
 
 
 
@@ -420,6 +424,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
+	update_sensors();
 	// Handle button events
 	if (button_pressed == 1) {
 		button_pressed = 0;

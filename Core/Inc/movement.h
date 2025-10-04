@@ -4,7 +4,7 @@
 void start_encoders(void);
 void turn_left(void);
 void turn_right(void);
-void move_forward_distance(int target_counts);
+void move_forward_distance(int Left_target_counts,int Right_target_counts);
 void turn_around(void);
 void stop_motors(void);
 void break_motors(void);

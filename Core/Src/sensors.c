@@ -160,10 +160,10 @@ void update_sensors4(void){
     sensors.battery = (uint16_t)(bat/8);
 
     // thresholds (use calibrated ones if valid)
-    uint16_t th_fl = is_sensor_calibration_valid() ? get_calibrated_threshold(0) : WALL_THRESHOLD_FRONT;
-    uint16_t th_fr = is_sensor_calibration_valid() ? get_calibrated_threshold(1) : WALL_THRESHOLD_FRONT;
-    uint16_t th_sl = is_sensor_calibration_valid() ? get_calibrated_threshold(2) : WALL_THRESHOLD_SIDE;
-    uint16_t th_sr = is_sensor_calibration_valid() ? get_calibrated_threshold(3) : WALL_THRESHOLD_SIDE;
+    uint16_t th_fl = is_sensor_calibration_valid() ? get_calibrated_threshold(0) : WALL_THRESHOLD_FRONT_L;
+    uint16_t th_fr = is_sensor_calibration_valid() ? get_calibrated_threshold(1) : WALL_THRESHOLD_FRONT_R;
+    uint16_t th_sl = is_sensor_calibration_valid() ? get_calibrated_threshold(2) : WALL_THRESHOLD_SIDE_L;
+    uint16_t th_sr = is_sensor_calibration_valid() ? get_calibrated_threshold(3) : WALL_THRESHOLD_SIDE_R;
 
     sensors.wall_front = (sensors.front_left > th_fl) || (sensors.front_right > th_fr);
     sensors.wall_left  = (sensors.side_left  > th_sl);
@@ -272,8 +272,9 @@ void update_sensors(void){
     sensors.side_right  = tot_diff_R/5;  //diff_R; //
     sensors.battery = read_adc_channel(ADC_CHANNEL_0);
 
+
     // Process wall detection using calibrated thresholds
-    if (sensor_cal.calibration_valid) {
+    if (false){//sensor_cal.calibration_valid) {
         // Use dynamic thresholds
         sensors.wall_front = (sensors.front_left > get_calibrated_threshold(0)) ||
                             (sensors.front_right > get_calibrated_threshold(1));
@@ -281,10 +282,10 @@ void update_sensors(void){
         sensors.wall_right = (sensors.side_right > get_calibrated_threshold(3));
     } else {
         // Fallback to static thresholds
-        sensors.wall_front = (sensors.front_left > WALL_THRESHOLD_FRONT) ||
-                            (sensors.front_right > WALL_THRESHOLD_FRONT);
-        sensors.wall_left = (sensors.side_left > WALL_THRESHOLD_SIDE);
-        sensors.wall_right = (sensors.side_right > WALL_THRESHOLD_SIDE);
+        sensors.wall_front = (sensors.front_left > WALL_THRESHOLD_FRONT_L) ||
+                            (sensors.front_right > WALL_THRESHOLD_FRONT_R);
+        sensors.wall_left = (sensors.side_left > WALL_THRESHOLD_SIDE_L);
+        sensors.wall_right = (sensors.side_right > WALL_THRESHOLD_SIDE_R);
     }
 
 
@@ -293,9 +294,9 @@ void update_sensors(void){
 //	                          on_L, off_L,on_R, off_R);
 
 
-	send_bluetooth_printf("FL:%u   FR:%u  Fwall: %d SL:%u Lwall: %d  SR:%u  Rwall: %d  \r\n",
-		                          sensors.front_left, sensors.front_right,sensors.wall_front,
-		                          sensors.side_left, sensors.wall_left, sensors.side_right, sensors.wall_right);
+//	send_bluetooth_printf("FL:%u   FR:%u  Fwall: %d SL:%u Lwall: %d  SR:%u  Rwall: %d  \r\n",
+//		                          sensors.front_left, sensors.front_right,sensors.wall_front,
+//		                          sensors.side_left, sensors.wall_left, sensors.side_right, sensors.wall_right);
 
 }
 
@@ -598,7 +599,7 @@ uint16_t get_calibrated_threshold(int sensor_index)
 {
     if (sensor_index < 0 || sensor_index > 3 || !sensor_cal.calibration_valid) {
         // Return default thresholds if calibration failed
-        return (sensor_index < 2) ? WALL_THRESHOLD_FRONT : WALL_THRESHOLD_SIDE;
+        return (sensor_index < 2) ? WALL_THRESHOLD_FRONT_L : WALL_THRESHOLD_SIDE_L;
     }
 
     return sensor_cal.wall_thresholds[sensor_index];

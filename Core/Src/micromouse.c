@@ -308,11 +308,9 @@ bool move_forward_one_cell(void) {
 
     send_bluetooth_printf("(%d,%d)\r\n", new_x, new_y);
 
-    // Reset PID controllers
-    moveStraightGyroPID_Reset();
 
     // Use precise encoder-based movement
-    move_forward_distance(ENCODER_COUNTS_PER_CELL);
+    move_forward_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
 
     // Update robot position
     robot.x = new_x;
