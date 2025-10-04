@@ -368,10 +368,13 @@ void update_maze_walls(void) {
 
     // Send wall detection feedback
     if (sensors.wall_front || sensors.wall_left || sensors.wall_right) {
-        send_bluetooth_printf("Walls detected: F:%s L:%s R:%s\r\n",
+        send_bluetooth_printf("Walls detected: F:%s L:%s R:%s  [FL:%d FR:%d SL:%d SR:%d]\r\n",
                              sensors.wall_front ? "Y" : "N",
                              sensors.wall_left ? "Y" : "N",
-                             sensors.wall_right ? "Y" : "N");
+                             sensors.wall_right ? "Y" : "N",
+                             sensors.front_left, sensors.front_right,
+                             sensors.side_left, sensors.side_right);
+
         play_wall_beep();
     }
 }

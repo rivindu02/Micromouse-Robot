@@ -315,54 +315,54 @@ void update_sensors(void){
 /**
  * @brief Update maze walls based on sensor readings
  */
-void update_walls(void)
-{
-    // Update walls based on current direction and sensor readings
-    if (sensors.wall_front) {
-        maze[robot.x][robot.y].walls[robot.direction] = true;
-        // Update opposite wall in neighbor cell
-        int nx = robot.x + dx[robot.direction];
-        int ny = robot.y + dy[robot.direction];
-        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-            maze[nx][ny].walls[(robot.direction + 2) % 4] = true;
-        }
-    }
-
-    if (sensors.wall_left) {
-        int left_dir = (robot.direction + 3) % 4;
-        maze[robot.x][robot.y].walls[left_dir] = true;
-        int nx = robot.x + dx[left_dir];
-        int ny = robot.y + dy[left_dir];
-        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-            maze[nx][ny].walls[(left_dir + 2) % 4] = true;
-        }
-    }
-
-    if (sensors.wall_right) {
-        int right_dir = (robot.direction + 1) % 4;
-        maze[robot.x][robot.y].walls[right_dir] = true;
-        int nx = robot.x + dx[right_dir];
-        int ny = robot.y + dy[right_dir];
-        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-            maze[nx][ny].walls[(right_dir + 2) % 4] = true;
-        }
-    }
-    // Simple debug feedback
-    if (sensors.wall_front || sensors.wall_left || sensors.wall_right) {
-        send_bluetooth_printf("Walls: F:%s L:%s R:%s [FL:%d FR:%d SL:%d SR:%d]\r\n",
-            sensors.wall_front ? "Y" : "N",
-            sensors.wall_left ? "Y" : "N",
-            sensors.wall_right ? "Y" : "N",
-            sensors.front_left, sensors.front_right,
-            sensors.side_left, sensors.side_right);
-        play_wall_beep();
-    }
-
-
-    // Mark current cell as visited
-    maze[robot.x][robot.y].visited = true;
-    maze[robot.x][robot.y].visit_count++;
-}
+//void update_walls(void)
+//{
+//    // Update walls based on current direction and sensor readings
+//    if (sensors.wall_front) {
+//        maze[robot.x][robot.y].walls[robot.direction] = true;
+//        // Update opposite wall in neighbor cell
+//        int nx = robot.x + dx[robot.direction];
+//        int ny = robot.y + dy[robot.direction];
+//        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
+//            maze[nx][ny].walls[(robot.direction + 2) % 4] = true;
+//        }
+//    }
+//
+//    if (sensors.wall_left) {
+//        int left_dir = (robot.direction + 3) % 4;
+//        maze[robot.x][robot.y].walls[left_dir] = true;
+//        int nx = robot.x + dx[left_dir];
+//        int ny = robot.y + dy[left_dir];
+//        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
+//            maze[nx][ny].walls[(left_dir + 2) % 4] = true;
+//        }
+//    }
+//
+//    if (sensors.wall_right) {
+//        int right_dir = (robot.direction + 1) % 4;
+//        maze[robot.x][robot.y].walls[right_dir] = true;
+//        int nx = robot.x + dx[right_dir];
+//        int ny = robot.y + dy[right_dir];
+//        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
+//            maze[nx][ny].walls[(right_dir + 2) % 4] = true;
+//        }
+//    }
+//    // Simple debug feedback
+//    if (sensors.wall_front || sensors.wall_left || sensors.wall_right) {
+//        send_bluetooth_printf("Walls: F:%s L:%s R:%s [FL:%d FR:%d SL:%d SR:%d]\r\n",
+//            sensors.wall_front ? "Y" : "N",
+//            sensors.wall_left ? "Y" : "N",
+//            sensors.wall_right ? "Y" : "N",
+//            sensors.front_left, sensors.front_right,
+//            sensors.side_left, sensors.side_right);
+//        play_wall_beep();
+//    }
+//
+//
+//    // Mark current cell as visited
+//    maze[robot.x][robot.y].visited = true;
+//    maze[robot.x][robot.y].visit_count++;
+//}
 
 
 /**

@@ -8,9 +8,9 @@
 ../Core/Src/micromouse.c:247:6:turn_to_direction	24	static
 ../Core/Src/micromouse.c:281:6:move_forward_one_cell	16	static
 ../Core/Src/micromouse.c:317:6:is_at_goal	4	static
-../Core/Src/micromouse.c:331:6:update_maze_walls	40	static
-../Core/Src/micromouse.c:382:6:explore_maze	40	static
-../Core/Src/micromouse.c:461:6:run_maze_exploration_sequence	40	static
-../Core/Src/micromouse.c:509:6:is_exploration_complete	4	static
-../Core/Src/micromouse.c:516:7:get_exploration_efficiency	24	static
-../Core/Src/micromouse.c:532:5:get_optimal_distance	4	static
+../Core/Src/micromouse.c:331:6:update_maze_walls	72	static
+../Core/Src/micromouse.c:385:6:explore_maze	40	static
+../Core/Src/micromouse.c:464:6:run_maze_exploration_sequence	40	static
+../Core/Src/micromouse.c:512:6:is_exploration_complete	4	static
+../Core/Src/micromouse.c:519:7:get_exploration_efficiency	24	static
+../Core/Src/micromouse.c:535:5:get_optimal_distance	4	static
