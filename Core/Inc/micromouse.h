@@ -17,7 +17,7 @@
 #include <math.h>    // For fabsf(), sqrtf()
 
 /* Maze configuration */
-#define MAZE_SIZE 12
+#define MAZE_SIZE 16
 #define MAX_DISTANCE 9999
 #define CELL_SIZE_MM 180.0f
 
@@ -29,15 +29,15 @@
 
 /* Movement parameters */
 
-#define LEFT_ENCODER_COUNTS_PER_CELL 2555		// Updated
-#define RIGHT_ENCODER_COUNTS_PER_CELL 2539
+#define LEFT_ENCODER_COUNTS_PER_CELL 2560		// Updated
+#define RIGHT_ENCODER_COUNTS_PER_CELL 2560
 #define ENCODER_COUNTS_PER_TURN 500
 
 /* Sensor thresholds */
 #define WALL_THRESHOLD_FRONT_L 6   //2000
 #define WALL_THRESHOLD_FRONT_R 6
-#define WALL_THRESHOLD_SIDE_L 15      //1500
-#define WALL_THRESHOLD_SIDE_R 15
+#define WALL_THRESHOLD_SIDE_L 11      //1500
+#define WALL_THRESHOLD_SIDE_R 14
 #define BATTERY_LOW_THRESHOLD 3000
 #define IR_AMBIENT_THRESHOLD 500
 
@@ -334,6 +334,8 @@ void turn_to_direction(int target_direction);
  * @return true if movement successful, false if blocked
  */
 bool move_forward_one_cell(void);
+
+bool move_forward_one_cell_truns(void);
 
 /**
  * @brief Check if robot is at current goal position

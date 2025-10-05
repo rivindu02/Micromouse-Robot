@@ -365,16 +365,16 @@ int main(void)
 //  int mode = 0;               // WF_AUTO
 //  int base_pwm = 570;         // use the speed you tuned at
 //
-//  // bootstrap targets & reset integrators
-//  wall_follow_reset_int(mode, base_pwm);
+//    // bootstrap targets & reset integrators
+//  	wall_follow_reset_int(mode, base_pwm);
 //
-//  while (1) {
-//      wall_follow_step();     // computes e, PID, sets motor PWMs
-//      //HAL_Delay(2);           // keep a steady loop
-//      dwt_delay_us(50);
-//  }
-
-
+//	while (1) {
+//		wall_follow_step();     // computes e, PID, sets motor PWMs
+//		//HAL_Delay(200);           // keep a steady loop
+//		dwt_delay_us(50);
+//
+//	}
+  //turn_left();
 
 //  debug_encoder_setup();
 //  test_encoder_manual();
@@ -390,7 +390,8 @@ int main(void)
   // get ADC Values//////////////////////////////////////////////////////
 
 //  while(1){
-//	  update_sensors();
+//	  //update_sensors();
+//	  update_maze_walls();
 //
 //	  HAL_Delay(500);
 //  }
@@ -424,7 +425,7 @@ int main(void)
 
     /* USER CODE BEGIN 3 */
 
-	update_sensors();
+	//update_sensors();
 	// Handle button events
 	if (button_pressed == 1) {
 		button_pressed = 0;

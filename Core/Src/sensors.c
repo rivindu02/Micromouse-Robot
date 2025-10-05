@@ -247,29 +247,29 @@ void update_sensors(void){
 
 
 
-	FL_buff[point]=diff_FL;
-	FR_buff[point]=diff_FR;
-	L_buff[point]=diff_L;
-	R_buff[point]=diff_R;
+//	FL_buff[point]=diff_FL;
+//	FR_buff[point]=diff_FR;
+//	L_buff[point]=diff_L;
+//	R_buff[point]=diff_R;
+//
+//	point++;
+//
+//	uint32_t tot_diff_FL=0;
+//	uint32_t tot_diff_FR=0;
+//	uint32_t tot_diff_L=0;
+//	uint32_t tot_diff_R=0;
+//
+//	for (int i=0;i<5;i++){
+//		tot_diff_FL+=FL_buff[i];
+//		tot_diff_FR+=FR_buff[i];
+//		tot_diff_L+=L_buff[i];
+//		tot_diff_R+=R_buff[i];
+//	}
 
-	point++;
-
-	uint32_t tot_diff_FL=0;
-	uint32_t tot_diff_FR=0;
-	uint32_t tot_diff_L=0;
-	uint32_t tot_diff_R=0;
-
-	for (int i=0;i<5;i++){
-		tot_diff_FL+=FL_buff[i];
-		tot_diff_FR+=FR_buff[i];
-		tot_diff_L+=L_buff[i];
-		tot_diff_R+=R_buff[i];
-	}
-
-    sensors.front_left  = tot_diff_FL/5; //diff_FL; //
-    sensors.front_right = tot_diff_FR/5; //diff_FR; //
-    sensors.side_left   = tot_diff_L/5;  //diff_L; //
-    sensors.side_right  = tot_diff_R/5;  //diff_R; //
+    sensors.front_left  = diff_FL; //tot_diff_FL/5; //
+    sensors.front_right = diff_FR; // tot_diff_FR/5; //
+    sensors.side_left   = diff_L; // tot_diff_L/5;  //
+    sensors.side_right  = diff_R; //tot_diff_R/5;  //
     sensors.battery = read_adc_channel(ADC_CHANNEL_0);
 
 
@@ -303,54 +303,54 @@ void update_sensors(void){
 /**
  * @brief Update maze walls based on sensor readings
  */
-void update_walls(void)
-{
-    // Update walls based on current direction and sensor readings
-    if (sensors.wall_front) {
-        maze[robot.x][robot.y].walls[robot.direction] = true;
-        // Update opposite wall in neighbor cell
-        int nx = robot.x + dx[robot.direction];
-        int ny = robot.y + dy[robot.direction];
-        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-            maze[nx][ny].walls[(robot.direction + 2) % 4] = true;
-        }
-    }
-
-    if (sensors.wall_left) {
-        int left_dir = (robot.direction + 3) % 4;
-        maze[robot.x][robot.y].walls[left_dir] = true;
-        int nx = robot.x + dx[left_dir];
-        int ny = robot.y + dy[left_dir];
-        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-            maze[nx][ny].walls[(left_dir + 2) % 4] = true;
-        }
-    }
-
-    if (sensors.wall_right) {
-        int right_dir = (robot.direction + 1) % 4;
-        maze[robot.x][robot.y].walls[right_dir] = true;
-        int nx = robot.x + dx[right_dir];
-        int ny = robot.y + dy[right_dir];
-        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-            maze[nx][ny].walls[(right_dir + 2) % 4] = true;
-        }
-    }
-    // Simple debug feedback
-    if (sensors.wall_front || sensors.wall_left || sensors.wall_right) {
-        send_bluetooth_printf("Walls: F:%s L:%s R:%s [FL:%d FR:%d SL:%d SR:%d]\r\n",
-            sensors.wall_front ? "Y" : "N",
-            sensors.wall_left ? "Y" : "N",
-            sensors.wall_right ? "Y" : "N",
-            sensors.front_left, sensors.front_right,
-            sensors.side_left, sensors.side_right);
-        play_wall_beep();
-    }
-
-
-    // Mark current cell as visited
-    maze[robot.x][robot.y].visited = true;
-    maze[robot.x][robot.y].visit_count++;
-}
+//void update_walls(void)
+//{
+//    // Update walls based on current direction and sensor readings
+//    if (sensors.wall_front) {
+//        maze[robot.x][robot.y].walls[robot.direction] = true;
+//        // Update opposite wall in neighbor cell
+//        int nx = robot.x + dx[robot.direction];
+//        int ny = robot.y + dy[robot.direction];
+//        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
+//            maze[nx][ny].walls[(robot.direction + 2) % 4] = true;
+//        }
+//    }
+//
+//    if (sensors.wall_left) {
+//        int left_dir = (robot.direction + 3) % 4;
+//        maze[robot.x][robot.y].walls[left_dir] = true;
+//        int nx = robot.x + dx[left_dir];
+//        int ny = robot.y + dy[left_dir];
+//        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
+//            maze[nx][ny].walls[(left_dir + 2) % 4] = true;
+//        }
+//    }
+//
+//    if (sensors.wall_right) {
+//        int right_dir = (robot.direction + 1) % 4;
+//        maze[robot.x][robot.y].walls[right_dir] = true;
+//        int nx = robot.x + dx[right_dir];
+//        int ny = robot.y + dy[right_dir];
+//        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
+//            maze[nx][ny].walls[(right_dir + 2) % 4] = true;
+//        }
+//    }
+//    // Simple debug feedback
+//    if (sensors.wall_front || sensors.wall_left || sensors.wall_right) {
+//        send_bluetooth_printf("Walls: F:%s L:%s R:%s [FL:%d FR:%d SL:%d SR:%d]\r\n",
+//            sensors.wall_front ? "Y" : "N",
+//            sensors.wall_left ? "Y" : "N",
+//            sensors.wall_right ? "Y" : "N",
+//            sensors.front_left, sensors.front_right,
+//            sensors.side_left, sensors.side_right);
+//        play_wall_beep();
+//    }
+//
+//
+//    // Mark current cell as visited
+//    maze[robot.x][robot.y].visited = true;
+//    maze[robot.x][robot.y].visit_count++;
+//}
 
 
 /**

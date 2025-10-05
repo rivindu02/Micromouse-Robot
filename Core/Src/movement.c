@@ -106,22 +106,32 @@ void turn_left(void) {
 
     // turn 90 degrees left using gyro PID, 1200 ms timeout for safety
 	if (sensors.wall_front){
-		align_front_to_wall(700,1500);
-//	}else{
-//		dwt_delay_us(100);
-//
+		align_front_to_wall(600,4000);
+	}else{
 
+		move_forward_distance(957,957);
 
+		//dwt_delay_us(100);
 	}
+
+
     gyro_turn_reset();
     turn_in_place_gyro(+90.0f, 520, 1200);
+
+    //move_forward_distance(1549,1537);//////////////
     robot.direction = (robot.direction + 3) % 4;
 
 }
 
 void turn_right(void) {
-	if (sensors.wall_front)	align_front_to_wall(700,1500);
+	if (sensors.wall_front){
+		align_front_to_wall(600,3000);
+	}else{
+		move_forward_distance(957,957);
+	}
+	gyro_turn_reset();
     turn_in_place_gyro(-90.0f, 520, 1200);
+    //move_forward_distance(1530,1562);
     robot.direction = (robot.direction + 1) % 4;
 }
 
@@ -129,8 +139,20 @@ void turn_right(void) {
  * @brief Turn around 180 degrees
  */
 void turn_around(void) {
-    turn_right();
-    turn_right();
+	if (sensors.wall_front){
+		align_front_to_wall(600,3000);
+	}else{
+		move_forward_distance(957,957);
+	}
+	turn_in_place_gyro(-90.0f, 520, 1200);
+	turn_in_place_gyro(-90.0f, 520, 1200);
+
+	//move_forward_distance(1330,1352);/////////////////
+
+	robot.direction = (robot.direction + 1) % 4;
+	robot.direction = (robot.direction + 1) % 4;
+
+
 }
 
 /**
@@ -190,6 +212,51 @@ void move_forward_distance(int Left_target_counts,int Right_target_counts) {		//
 
     break_motors();		// use a S-curve to apply break/////////////////////
 }
+
+/**
+ * @brief Move forward a specific distance - FIXED VERSION
+ */
+void move_forward_WF_distance(int Left_target_counts,int Right_target_counts) {		// CHECK////////////////////////////////////////
+
+    // FIXED: Use safe encoder reading
+	reset_encoder_totals();
+    int32_t start_left = get_left_encoder_total();
+    int32_t start_right = get_right_encoder_total();
+    // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
+    int mode = 0;               // WF_AUTO
+    int base_pwm = 700;         // use the speed you tuned at
+
+    // bootstrap targets & reset integrators
+    wall_follow_reset_int(mode, base_pwm);
+
+    while (1) {
+    	wall_follow_step();     // computes e, PID, sets motor PWMs
+		//HAL_Delay(200);           // keep a steady loop
+		dwt_delay_us(50);
+
+
+        int32_t current_left = get_left_encoder_total();
+        int32_t current_right = get_right_encoder_total();
+        int32_t left_traveled =  start_left-current_left;
+        int32_t right_traveled = start_right-current_right;
+        //int32_t avg_traveled = (left_traveled + right_traveled) / 2;
+
+        //send_bluetooth_printf("L:%ld R:%ld\r\n",current_left,current_right);
+
+        if (left_traveled>=Left_target_counts || right_traveled>=Right_target_counts) {
+            break;
+        }
+        HAL_Delay(1);
+    }
+
+    break_motors();		// use a S-curve to apply break/////////////////////
+}
+
+
+
+
+
+
 
 
 
@@ -733,7 +800,7 @@ void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms)
         HAL_Delay(2); // ~500 Hz outer loop
     }
 
-    stop_motors();
+    break_motors();
     HAL_Delay(60);
 }
 

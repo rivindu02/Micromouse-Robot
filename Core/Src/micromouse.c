@@ -255,6 +255,8 @@ int get_best_direction(void) {
 
     return best_dir;
 }
+int l=0;
+int r=0;
 
 /**
  * @brief Turn robot to face the specified direction
@@ -271,18 +273,24 @@ void turn_to_direction(int target_direction) {
             // Turn right (90 degrees clockwise)
             send_bluetooth_message("Turning RIGHT...\r\n");
             turn_right();
+            l=1549;
+            r=1537;
             play_turn_beep();
             break;
         case 2:
             // Turn around (180 degrees)
             send_bluetooth_message("Turning AROUND...\r\n");
             turn_around();
+            l=1530;
+            r=1562;
             play_turn_beep();
             break;
         case 3:
             // Turn left (90 degrees counter-clockwise)
             send_bluetooth_message("Turning LEFT...\r\n");
             turn_left();
+            l=1330;
+            r=1352;
             play_turn_beep();
             break;
     }
@@ -311,6 +319,61 @@ bool move_forward_one_cell(void) {
 
     // Use precise encoder-based movement
     move_forward_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
+
+    // Update robot position
+    robot.x = new_x;
+    robot.y = new_y;
+    robot.exploration_steps++;
+
+    // Mark cell as visited
+    maze[robot.x][robot.y].visited = true;
+    maze[robot.x][robot.y].visit_count++;
+
+    return true;
+}
+int flag=1;
+
+bool move_forward_one_cell_truns(void){
+    send_bluetooth_printf("Moving forward from (%d,%d) to ", robot.x, robot.y);
+
+    // Calculate new position
+    int new_x = robot.x + dx[robot.direction];
+    int new_y = robot.y + dy[robot.direction];
+
+    // Check bounds
+    if (new_x < 0 || new_x >= MAZE_SIZE || new_y < 0 || new_y >= MAZE_SIZE) {
+        send_bluetooth_message("BLOCKED - Out of bounds!\r\n");
+        return false;
+    }
+
+    send_bluetooth_printf("(%d,%d)\r\n", new_x, new_y);
+    if (l!=0 && r!=0){
+    	move_forward_distance(l,r);
+    	l=0;
+    	r=0;
+    }
+    else if (sensors.wall_left || sensors.wall_right){
+    	if (flag==1){
+    		move_forward_WF_distance(1200,1200);
+    		flag=0;
+    	}else{
+    		move_forward_WF_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
+    	}
+
+
+
+    }else{
+    	if (flag==1){
+			move_forward_distance(1200 ,1200);
+			flag=0;
+    	}else{
+    		move_forward_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
+    	}
+    }
+
+
+    // Use precise encoder-based movement
+
 
     // Update robot position
     robot.x = new_x;
@@ -380,13 +443,21 @@ void update_maze_walls(void) {
     }
 
     // Send wall detection feedback
+    // Send wall detection feedback
     if (sensors.wall_front || sensors.wall_left || sensors.wall_right) {
-        send_bluetooth_printf("Walls detected: F:%s L:%s R:%s\r\n",
+        send_bluetooth_printf("Walls detected: F:%s L:%s R:%s  [FL:%d FR:%d SL:%d SR:%d]\r\n",
                              sensors.wall_front ? "Y" : "N",
                              sensors.wall_left ? "Y" : "N",
-                             sensors.wall_right ? "Y" : "N");
+                             sensors.wall_right ? "Y" : "N",
+                             sensors.front_left, sensors.front_right,
+                             sensors.side_left, sensors.side_right);
+
         play_wall_beep();
     }
+
+    // Mark current cell as visited
+    maze[robot.x][robot.y].visited = true;
+    maze[robot.x][robot.y].visit_count++;
 }
 
 /**
@@ -401,6 +472,7 @@ void explore_maze(void) {
     while (!is_at_goal() && steps < max_steps) {
         // Update wall information
         update_maze_walls();
+        HAL_Delay(10);
 
         // Run flood fill algorithm
         flood_fill_algorithm();
@@ -412,7 +484,7 @@ void explore_maze(void) {
         turn_to_direction(best_direction);
 
         // Move forward if possible
-        if (!move_forward_one_cell()) {
+        if (!move_forward_one_cell_truns()){
             send_bluetooth_message("❌ Movement failed! Trying alternative...\r\n");
 
             // Try alternative directions
@@ -438,7 +510,7 @@ void explore_maze(void) {
         steps++;
 
         // Brief delay for stability
-        HAL_Delay(100);
+        //HAL_Delay(100);
     }
 
     if (is_at_goal()) {

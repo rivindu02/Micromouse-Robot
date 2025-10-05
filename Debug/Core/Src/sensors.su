@@ -3,8 +3,7 @@
 ../Core/Src/sensors.c:112:24:diff_once	32	static
 ../Core/Src/sensors.c:130:17:measure_sync	48	static
 ../Core/Src/sensors.c:145:6:update_sensors4	96	static
-../Core/Src/sensors.c:185:6:update_sensors	64	static
-../Core/Src/sensors.c:306:6:update_walls	72	static
+../Core/Src/sensors.c:185:6:update_sensors	48	static
 ../Core/Src/sensors.c:364:6:calibrate_sensors	168	static
 ../Core/Src/sensors.c:588:6:is_sensor_calibration_valid	4	static
 ../Core/Src/sensors.c:598:10:get_calibrated_threshold	16	static
