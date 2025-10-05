@@ -156,8 +156,8 @@ void update_sensors4(void){
     sensors.side_right  = measure_sync(p[3], pin[3], ch[3]);
 
     // battery (light average)
-    uint32_t bat=0; for (int i=0;i<8;i++) bat += read_adc_channel(ADC_CHANNEL_0);
-    sensors.battery = (uint16_t)(bat/8);
+    uint32_t bat=0; for (int i=0;i<4;i++) bat += read_adc_channel(ADC_CHANNEL_0);
+    sensors.battery = (uint16_t)(bat/4);
 
     // thresholds (use calibrated ones if valid)
     uint16_t th_fl = is_sensor_calibration_valid() ? get_calibrated_threshold(0) : WALL_THRESHOLD_FRONT_L;
@@ -175,12 +175,6 @@ void update_sensors4(void){
 }
 
 
-int point=0;
-
-uint32_t FL_buff[5];
-uint32_t FR_buff[5];
-uint32_t L_buff[5];
-uint32_t R_buff[5];
 
 void update_sensors(void){
 	turn_off_emitters();
@@ -235,40 +229,15 @@ void update_sensors(void){
 		diff_R = 0;
 	}
 
-	if (point>=5) point=0;
-
-
-
 	diff_FL=(diff_FL*NOMINAL)/1000;
 	diff_FR=(diff_FR*NOMINAL)/1000;
 	diff_L=(diff_L*NOMINAL)/1000;
 	diff_R=(diff_R*NOMINAL)/1000;
 
 
-
-
-//	FL_buff[point]=diff_FL;
-//	FR_buff[point]=diff_FR;
-//	L_buff[point]=diff_L;
-//	R_buff[point]=diff_R;
-//
-//	point++;
-//
-//	uint32_t tot_diff_FL=0;
-//	uint32_t tot_diff_FR=0;
-//	uint32_t tot_diff_L=0;
-//	uint32_t tot_diff_R=0;
-//
-//	for (int i=0;i<5;i++){
-//		tot_diff_FL+=FL_buff[i];
-//		tot_diff_FR+=FR_buff[i];
-//		tot_diff_L+=L_buff[i];
-//		tot_diff_R+=R_buff[i];
-//	}
-
-    sensors.front_left  = diff_FL; //tot_diff_FL/5; //
-    sensors.front_right = diff_FR; // tot_diff_FR/5; //
-    sensors.side_left   = diff_L; // tot_diff_L/5;  //
+    sensors.front_left  = diff_FL;
+    sensors.front_right = diff_FR;
+    sensors.side_left   = diff_L;
     sensors.side_right  = diff_R; //tot_diff_R/5;  //
     sensors.battery = read_adc_channel(ADC_CHANNEL_0);
 
@@ -289,68 +258,12 @@ void update_sensors(void){
     }
 
 
-//	send_bluetooth_printf("FL:%u - %u  FR:%u - %u  SL:%u - %u  SR:%u - %u \r\n",
-//	                          on_FL, off_FL, on_FR,off_FR,
-//	                          on_L, off_L,on_R, off_R);
-
-
 //	send_bluetooth_printf("FL:%u   FR:%u  Fwall: %d SL:%u Lwall: %d  SR:%u  Rwall: %d  \r\n",
 //		                          sensors.front_left, sensors.front_right,sensors.wall_front,
 //		                          sensors.side_left, sensors.wall_left, sensors.side_right, sensors.wall_right);
 
 }
 
-/**
- * @brief Update maze walls based on sensor readings
- */
-//void update_walls(void)
-//{
-//    // Update walls based on current direction and sensor readings
-//    if (sensors.wall_front) {
-//        maze[robot.x][robot.y].walls[robot.direction] = true;
-//        // Update opposite wall in neighbor cell
-//        int nx = robot.x + dx[robot.direction];
-//        int ny = robot.y + dy[robot.direction];
-//        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-//            maze[nx][ny].walls[(robot.direction + 2) % 4] = true;
-//        }
-//    }
-//
-//    if (sensors.wall_left) {
-//        int left_dir = (robot.direction + 3) % 4;
-//        maze[robot.x][robot.y].walls[left_dir] = true;
-//        int nx = robot.x + dx[left_dir];
-//        int ny = robot.y + dy[left_dir];
-//        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-//            maze[nx][ny].walls[(left_dir + 2) % 4] = true;
-//        }
-//    }
-//
-//    if (sensors.wall_right) {
-//        int right_dir = (robot.direction + 1) % 4;
-//        maze[robot.x][robot.y].walls[right_dir] = true;
-//        int nx = robot.x + dx[right_dir];
-//        int ny = robot.y + dy[right_dir];
-//        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-//            maze[nx][ny].walls[(right_dir + 2) % 4] = true;
-//        }
-//    }
-//    // Simple debug feedback
-//    if (sensors.wall_front || sensors.wall_left || sensors.wall_right) {
-//        send_bluetooth_printf("Walls: F:%s L:%s R:%s [FL:%d FR:%d SL:%d SR:%d]\r\n",
-//            sensors.wall_front ? "Y" : "N",
-//            sensors.wall_left ? "Y" : "N",
-//            sensors.wall_right ? "Y" : "N",
-//            sensors.front_left, sensors.front_right,
-//            sensors.side_left, sensors.side_right);
-//        play_wall_beep();
-//    }
-//
-//
-//    // Mark current cell as visited
-//    maze[robot.x][robot.y].visited = true;
-//    maze[robot.x][robot.y].visit_count++;
-//}
 
 
 /**
@@ -736,152 +649,4 @@ void diagnostic_sensor_test(void) {
     send_bluetooth_message("=== Place hand/object 5cm from sensor and retest ===\r\n");
 }
 
-
-
-
-
-//void update_sensors3(void)
-//{
-//    uint32_t ch[4]    = {ADC_CHANNEL_5, ADC_CHANNEL_2, ADC_CHANNEL_4, ADC_CHANNEL_3};
-//    GPIO_TypeDef* p[4]= {EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_RIGHT_GPIO_Port,
-//                         EMIT_SIDE_LEFT_GPIO_Port,  EMIT_SIDE_RIGHT_GPIO_Port};
-//    uint16_t pin[4]   = {EMIT_FRONT_LEFT_Pin, EMIT_FRONT_RIGHT_Pin,
-//                         EMIT_SIDE_LEFT_Pin,  EMIT_SIDE_RIGHT_Pin};
-//
-//    // synchronous, ambient-rejected readings
-//    uint16_t fl = measure_sync(p[0], pin[0], ch[0]);
-//    uint16_t fr = measure_sync(p[1], pin[1], ch[1]);
-//    uint16_t sl = measure_sync(p[2], pin[2], ch[2]);
-//    uint16_t sr = measure_sync(p[3], pin[3], ch[3]);
-//
-//    sensors.front_left  = fl;
-//    sensors.front_right = fr;
-//    sensors.side_left   = sl;
-//    sensors.side_right  = sr;
-//
-//    // battery (light average)
-//    uint32_t bat=0; for (int i=0;i<8;i++) bat += read_adc_channel(ADC_CHANNEL_0);
-//    sensors.battery = (uint16_t)(bat/8);
-//
-//    // thresholds (use your calibrated ones if valid)
-//    uint16_t th_fl = is_sensor_calibration_valid() ? get_calibrated_threshold(0) : WALL_THRESHOLD_FRONT;
-//    uint16_t th_fr = is_sensor_calibration_valid() ? get_calibrated_threshold(1) : WALL_THRESHOLD_FRONT;
-//    uint16_t th_sl = is_sensor_calibration_valid() ? get_calibrated_threshold(2) : WALL_THRESHOLD_SIDE;
-//    uint16_t th_sr = is_sensor_calibration_valid() ? get_calibrated_threshold(3) : WALL_THRESHOLD_SIDE;
-//
-//    sensors.wall_front = (fl > th_fl) || (fr > th_fr);
-//    sensors.wall_left  = (sl > th_sl);
-//    sensors.wall_right = (sr > th_sr);
-//
-//	send_bluetooth_printf("FL:%u   FR:%u   SL:%u   SR:%u    \r\n",
-//		                          sensors.front_left, sensors.front_right,
-//		                          sensors.side_left, sensors.side_right);
-//
-//}
-
-
-
-
-/**
- * @brief Enhanced update_sensors with calibrated thresholds
- */
-//void update_sensors2(void)
-//{
-////    // Read ambient light levels (emitters off)
-////    turn_off_emitters();
-////    HAL_Delay(5);
-////    uint16_t ambient_front_right = read_adc_channel(ADC_CHANNEL_2);
-////    uint16_t ambient_side_right = read_adc_channel(ADC_CHANNEL_3);
-////    uint16_t ambient_side_left = read_adc_channel(ADC_CHANNEL_4);
-////    uint16_t ambient_front_left = read_adc_channel(ADC_CHANNEL_5);
-////
-////    // Read with emitters on
-////    turn_on_emitters();
-////    sensors.battery = read_adc_channel(ADC_CHANNEL_0);
-////    sensors.front_right = read_adc_channel(ADC_CHANNEL_2) - ambient_front_right;
-////    sensors.side_right = read_adc_channel(ADC_CHANNEL_3) - ambient_side_right;
-////    sensors.side_left = read_adc_channel(ADC_CHANNEL_4) - ambient_side_left;
-////    sensors.front_left = read_adc_channel(ADC_CHANNEL_5) - ambient_front_left;
-////
-////    // Turn off emitters to save power
-////    turn_off_emitters();
-//
-//	uint32_t channels[] = {ADC_CHANNEL_5, ADC_CHANNEL_2, ADC_CHANNEL_4, ADC_CHANNEL_3};
-//	GPIO_TypeDef* emit_ports[] = {EMIT_FRONT_LEFT_GPIO_Port, EMIT_FRONT_RIGHT_GPIO_Port,
-//								  EMIT_SIDE_LEFT_GPIO_Port, EMIT_SIDE_RIGHT_GPIO_Port};
-//	uint16_t emit_pins[] = {EMIT_FRONT_LEFT_Pin, EMIT_FRONT_RIGHT_Pin,
-//						   EMIT_SIDE_LEFT_Pin, EMIT_SIDE_RIGHT_Pin};
-//
-//	int16_t difference[4];
-//
-//
-//
-//	turn_off_emitters();
-//
-//	for(int i = 0; i < 4; i++) {
-//		// Test with emitter OFF
-//		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_RESET);
-//		HAL_Delay(2);	//10
-//		uint16_t off_reading = read_adc_channel(channels[i]);
-//
-//		// Test with emitter ON
-//		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_SET);
-//		HAL_Delay(2);	//10
-//		uint16_t on_reading = read_adc_channel(channels[i]);
-//
-//
-//		// Calculate difference
-//		//difference[i] = on_reading - off_reading;
-//
-//		// Calculate difference (clamped to >= 0)
-//		int32_t d = (int32_t)on_reading - (int32_t)off_reading;
-//		if (d < 0) d = 0;
-//		difference[i] = (int16_t)d;
-//
-//
-//		// Turn off emitter
-//		HAL_GPIO_WritePin(emit_ports[i], emit_pins[i], GPIO_PIN_RESET);
-//		HAL_Delay(3);	//50
-//	}
-//	sensors.battery = read_adc_channel(ADC_CHANNEL_0);
-//	sensors.front_right = difference[1];
-//	sensors.side_right = difference[3];
-//	sensors.side_left = difference[2];
-//	sensors.front_left = difference[0];
-//
-//    // Process wall detection using calibrated thresholds
-//    if (sensor_cal.calibration_valid) {
-//        // Use dynamic thresholds
-//        sensors.wall_front = (sensors.front_left > get_calibrated_threshold(0)) ||
-//                            (sensors.front_right > get_calibrated_threshold(1));
-//        sensors.wall_left = (sensors.side_left > get_calibrated_threshold(2));
-//        sensors.wall_right = (sensors.side_right > get_calibrated_threshold(3));
-//    } else {
-//        // Fallback to static thresholds
-//        sensors.wall_front = (sensors.front_left > WALL_THRESHOLD_FRONT) ||
-//                            (sensors.front_right > WALL_THRESHOLD_FRONT);
-//        sensors.wall_left = (sensors.side_left > WALL_THRESHOLD_SIDE);
-//        sensors.wall_right = (sensors.side_right > WALL_THRESHOLD_SIDE);
-//    }
-//
-//    // Enhanced sensor health monitoring using calibration data
-//    static uint8_t sensor_error_count = 0;
-//
-//    if (sensor_cal.calibration_valid) {
-//        // Check if readings are within expected ranges based on calibration
-//        bool current_reading_valid = (sensors.battery > sensor_cal.battery_baseline - 200) &&
-//                                   (sensors.battery < sensor_cal.battery_baseline + 500) &&
-//                                   (sensors.front_left < 3500) &&
-//                                   (sensors.front_right < 3500) &&
-//                                   (sensors.side_left < 3500) &&
-//                                   (sensors.side_right < 3500);
-//
-//        if (!current_reading_valid) {
-//            sensor_error_count++;
-//
-//        } else {
-//            if (sensor_error_count > 0) sensor_error_count--; // Recover slowly
-//        }
-//    }
-//}
 

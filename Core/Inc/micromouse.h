@@ -29,8 +29,8 @@
 
 /* Movement parameters */
 
-#define LEFT_ENCODER_COUNTS_PER_CELL 2560		// Updated
-#define RIGHT_ENCODER_COUNTS_PER_CELL 2560
+#define LEFT_ENCODER_COUNTS_PER_CELL 2460		// Updated
+#define RIGHT_ENCODER_COUNTS_PER_CELL 2460
 #define ENCODER_COUNTS_PER_TURN 500
 
 /* Sensor thresholds */

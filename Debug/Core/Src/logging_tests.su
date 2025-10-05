@@ -6,3 +6,6 @@
 ../Core/Src/logging_tests.c:190:6:run_gyro_turn_step_test	88	static
 ../Core/Src/logging_tests.c:249:6:run_wall_lateral_step_test	136	static
 ../Core/Src/logging_tests.c:311:6:run_wall_single_left_step_test	152	static
+../Core/Src/logging_tests.c:385:19:clampi_	24	static
+../Core/Src/logging_tests.c:388:21:signf_	16	static
+../Core/Src/logging_tests.c:406:6:run_wf_relay_test	160	static

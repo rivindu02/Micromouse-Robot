@@ -174,7 +174,7 @@ void break_motors(void)
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 1000);  // Right IN3 = HIGH
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, 1000);  // Right IN4 = HIGH
 
-    HAL_Delay(200);  // Hold brake briefly
+    HAL_Delay(20);  // Hold brake briefly
     stop_motors();   // Then coast
 }
 
@@ -182,7 +182,7 @@ void break_motors(void)
 /**
  * @brief Move forward a specific distance - FIXED VERSION
  */
-void move_forward_distance(int Left_target_counts,int Right_target_counts) {		// CHECK////////////////////////////////////////
+void move_forward_distance(int Left_target_counts,int Right_target_counts) {
 
     // FIXED: Use safe encoder reading
 	reset_encoder_totals();
@@ -216,7 +216,7 @@ void move_forward_distance(int Left_target_counts,int Right_target_counts) {		//
 /**
  * @brief Move forward a specific distance - FIXED VERSION
  */
-void move_forward_WF_distance(int Left_target_counts,int Right_target_counts) {		// CHECK////////////////////////////////////////
+void move_forward_WF_distance(int Left_target_counts,int Right_target_counts) {
 
     // FIXED: Use safe encoder reading
 	reset_encoder_totals();
@@ -224,7 +224,7 @@ void move_forward_WF_distance(int Left_target_counts,int Right_target_counts) {	
     int32_t start_right = get_right_encoder_total();
     // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
     int mode = 0;               // WF_AUTO
-    int base_pwm = 700;         // use the speed you tuned at
+    int base_pwm = 600;         // UPDATEDDDDDDDDDDDDDDDDDD
 
     // bootstrap targets & reset integrators
     wall_follow_reset_int(mode, base_pwm);
@@ -290,30 +290,6 @@ void motor_set(uint8_t motor, bool forward, uint16_t duty) {
         }
     }
 }
-/////////////////////////////////////////////// Check this NEW one abnd use
-
-//void motor_set(uint8_t motor, bool forward, uint16_t duty) {
-//    if (duty > 1000) duty = 1000;
-//
-//    if (motor == 0) { // Left: TIM3 CH1=IN1 (PA6), CH2=IN2 (PA7)
-//        if (forward) {
-//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, 0);
-//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, duty);
-//        } else {
-//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_1, duty);
-//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_2, 0);
-//        }
-//    } else {          // Right: TIM3 CH3=IN3 (PB0), CH4=IN4 (PB1)
-//        bool f = !forward; // your wiring inversion
-//        if (f) {
-//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 0);
-//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, duty);
-//        } else {
-//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, duty);
-//            __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, 0);
-//        }
-//    }
-//}
 
 
 // Add this function to test motors individually
@@ -472,18 +448,10 @@ void moveStraightPID(int base_pwm, bool left_forward, bool right_forward) {
 
 
 // PID parameters for gyro
-//float Kp_g = 0.8657f;//6.4; // Proportional term  //for moveStraightGyroPID2
-//float Ki_g = 5.3769f;//0; // Integral term
-//float Kd_g = 0.0f;//2; // Derivative term
-
 float Kp_g = 0.437213f;
 float Ki_g = 1.51547f;
 float Kd_g = 0.0189204f;
 
-//float error_g = 0;
-//float previousError_g = 0;
-//float integral_g = 0;
-//float derivative_g = 0;
 /* ----- Internal PID state (file-static) ----- */
 static float pid_error_prev = 0.0f;      // previous error (for derivative)
 static float pid_integral = 0.0f;        // integrated error (with dt)
@@ -525,77 +493,6 @@ void moveStraightGyroPID_Reset(void) {
     pid_last_ms = HAL_GetTick();
 }
 
-void moveStraightGyroPID2(void) {
-    // dt
-    uint32_t now = HAL_GetTick();
-    float dt = (now - pid_last_ms) / 1000.0f;
-    if (dt <= 0.0f) dt = 0.001f; // guard
-    pid_last_ms = now;
-
-    // measurement: gyro Z rate (deg/s). Target = 0.
-    float rate = mpu9250_get_gyro_z_compensated();
-
-    // cooldown countdown
-    learn_cooldown = fmaxf(0.0f, learn_cooldown - dt);
-
-    // detect slip/impact -> pause integrator updates
-    if (fabsf(rate) > SLIP_THRESH) {
-        learn_cooldown = COOLDOWN_TIME;
-    }
-
-    // -------- Integrator maintenance (leak + gated integration) --------
-    // Always apply leak (prevents indefinite drift)
-    pid_integral *= (1.0f - LEAK_RATE * dt);
-    if (!(pid_integral == pid_integral)) pid_integral = 0.0f; // NaN guard
-
-    // Only integrate when "calm": not tiny noise AND not cooling down
-    // (You can also add a 'hard_sat' gate below if you want.)
-    bool small_rate = (fabsf(rate) < ERR_DEADBAND);
-    if (!small_rate && (learn_cooldown <= 0.0f)) {
-        pid_integral += rate * dt;
-    }
-
-    // -------- PID (unsaturated correction) --------
-    float deriv_raw = (rate - pid_error_prev) / dt;
-    pid_deriv_filt  = DERIV_FILTER_ALPHA * pid_deriv_filt
-                    + (1.0f - DERIV_FILTER_ALPHA) * deriv_raw;
-
-    float u_unsat = (Kp_g * rate) + (Ki_g * pid_integral) + (Kd_g * pid_deriv_filt);
-
-    // -------- Correction-space saturation --------
-    // Positive u increases left PWM and decreases right PWM by the same amount.
-    const float U_POS_MAX = (float)(PWM_MAX - base_pwm); // headroom up on left / down on right
-    const float U_NEG_MAX = (float)(base_pwm - PWM_MIN); // headroom down on left / up on right
-
-    float u_sat = u_unsat;
-    if (u_sat >  U_POS_MAX) u_sat =  U_POS_MAX;
-    if (u_sat < -U_NEG_MAX) u_sat = -U_NEG_MAX;
-
-    // Build motor PWMs from the SATURATED correction
-    int m1 = (int)roundf((float)base_pwm - u_sat); // right
-    int m2 = (int)roundf((float)base_pwm + u_sat); // left
-
-    // Clamp PWMs (belt & suspenders)
-    m1 = clamp_int(m1, PWM_MIN, PWM_MAX);
-    m2 = clamp_int(m2, PWM_MIN, PWM_MAX);
-
-    // Apply
-    motor_set(0, true, m2); // Left
-    motor_set(1, true, m1); // Right
-
-    // -------- Anti-windup back-calculation (on integral state) --------
-    // Drive integral so that u_unsat -> u_sat when saturated.
-    // I += Kaw * (u_sat - u_unsat) * dt / Ki
-    if (Ki_g > 1e-6f) {
-        pid_integral += KAW * (u_sat - u_unsat) * dt / Ki_g;
-    }
-
-    // Hard clamp integral after all updates
-    pid_integral = clampf_local(pid_integral, -INTEGRAL_LIMIT, INTEGRAL_LIMIT);
-
-    // Store for derivative
-    pid_error_prev = rate;
-}
 
 
 
@@ -803,229 +700,6 @@ void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms)
     break_motors();
     HAL_Delay(60);
 }
-
-
-
-
-
-
-
-
-
-
-
-
-// Enhanced wall following with sensor fusion
-
-
-// Wall following PID parameters
-//static float Kp_wall = 0.25f;   // Proportional gain for wall following
-//static float Ki_wall = 0.03f;   // Integral gain for wall following
-//static float Kd_wall = 0.01f;   // Derivative gain for wall following
-//
-//// Wall following state variables
-//static float wall_error_prev = 0.0f;
-//static float wall_integral = 0.0f;
-//static float wall_deriv_filt = 0.0f;
-//static uint32_t wall_last_ms = 0;
-//
-//// Wall following configuration constants
-//static const float WALL_TARGET_DISTANCE = 1800.0f;  // Target sensor reading for single wall
-//static const float WALL_INTEGRAL_LIMIT = 800.0f;    // Anti-windup limit
-//static const float WALL_DERIV_FILTER_ALPHA = 0.75f; // Derivative filter
-//static const float GYRO_WALL_BLEND_RATIO = 0.65f;   // 65% gyro, 35% wall correction
-//
-///**
-// * @brief Reset wall following PID state
-// * Call this before starting a new wall following movement
-// */
-//void wallFollowPID_Reset(void) {
-//    wall_error_prev = 0.0f;
-//    wall_integral = 0.0f;
-//    wall_deriv_filt = 0.0f;
-//    wall_last_ms = HAL_GetTick();
-//
-//    // Also reset gyro PID
-//    moveStraightGyroPID_Reset();
-//}
-//
-///**
-// * @brief Enhanced movement with sensor fusion: gyro + wall following
-// *
-// * @param base_pwm Base PWM for forward movement (recommended: 600-700)
-// * @param wall_mode Wall following mode (NONE, LEFT, RIGHT, BOTH)
-// *
-// * Usage examples:
-// * - moveStraightSensorFusion(650, WALL_FOLLOW_BOTH);   // Center between walls
-// * - moveStraightSensorFusion(600, WALL_FOLLOW_LEFT);   // Follow left wall
-// * - moveStraightSensorFusion(650, WALL_FOLLOW_NONE);   // Gyro only
-// */
-//void moveStraightSensorFusion(int base_pwm, WallFollowMode_t wall_mode) {
-//    // Always update sensors and gyro
-//    update_sensors();
-//    mpu9250_read_gyro();
-//
-//    // Calculate timing for wall PID
-//    uint32_t now = HAL_GetTick();
-//    float dt = (now - wall_last_ms) / 1000.0f;
-//    if (dt <= 0.0f) dt = 0.001f;
-//    wall_last_ms = now;
-//
-//    // --- GYRO CORRECTION (Heading Stability) ---
-//    float gyro_error = mpu9250_get_gyro_z_compensated();
-//
-//    // Use existing gyro PID gains and state
-//    extern float Kp_g, Ki_g, Kd_g;
-//    static float gyro_integral_local = 0.0f;
-//    static float gyro_prev_error = 0.0f;
-//
-//    gyro_integral_local += gyro_error * dt;
-//    gyro_integral_local = fmaxf(-2000.0f, fminf(2000.0f, gyro_integral_local)); // Anti-windup
-//
-//    float gyro_derivative = (gyro_error - gyro_prev_error) / dt;
-//    float gyro_correction = (Kp_g * gyro_error) + (Ki_g * gyro_integral_local) + (Kd_g * gyro_derivative);
-//    gyro_prev_error = gyro_error;
-//
-//    // --- WALL FOLLOWING CORRECTION (Lateral Position) ---
-//    float wall_correction = 0.0f;
-//    bool wall_active = false;
-//
-//    if (wall_mode != WALL_FOLLOW_NONE) {
-//        float wall_error = 0.0f;
-//
-//        switch (wall_mode) {
-//            case WALL_FOLLOW_LEFT:
-//                if (sensors.wall_left) {
-//                    // Error: positive = too close to wall, negative = too far
-//                    wall_error = (float)sensors.side_left - WALL_TARGET_DISTANCE;
-//                    wall_error = -wall_error * 0.5f; // Invert and reduce gain for single wall
-//                    wall_active = true;
-//                }
-//                break;
-//
-//            case WALL_FOLLOW_RIGHT:
-//                if (sensors.wall_right) {
-//                    // Error: positive = too close to wall, negative = too far
-//                    wall_error = (float)sensors.side_right - WALL_TARGET_DISTANCE;
-//                    wall_error = wall_error * 0.5f; // Reduce gain for single wall
-//                    wall_active = true;
-//                }
-//                break;
-//
-//            case WALL_FOLLOW_BOTH:
-//                if (sensors.wall_left && sensors.wall_right) {
-//                    // Centering error: positive = closer to right, negative = closer to left
-//                    wall_error = (float)sensors.side_right - (float)sensors.side_left;
-//                    wall_active = true;
-//                } else if (sensors.wall_left && !sensors.wall_right) {
-//                    // Only left wall - maintain distance
-//                    wall_error = (float)sensors.side_left - WALL_TARGET_DISTANCE;
-//                    wall_error = -wall_error * 0.3f; // Reduced gain for single wall mode
-//                    wall_active = true;
-//                } else if (sensors.wall_right && !sensors.wall_left) {
-//                    // Only right wall - maintain distance
-//                    wall_error = (float)sensors.side_right - WALL_TARGET_DISTANCE;
-//                    wall_error = wall_error * 0.3f; // Reduced gain for single wall mode
-//                    wall_active = true;
-//                }
-//                break;
-//
-//            default:
-//                break;
-//        }
-//
-//        // Calculate wall PID correction if wall following is active
-//        if (wall_active) {
-//            wall_integral += wall_error * dt;
-//            wall_integral = fmaxf(-WALL_INTEGRAL_LIMIT, fminf(WALL_INTEGRAL_LIMIT, wall_integral));
-//
-//            float wall_deriv_raw = (wall_error - wall_error_prev) / dt;
-//            wall_deriv_filt = WALL_DERIV_FILTER_ALPHA * wall_deriv_filt +
-//                             (1.0f - WALL_DERIV_FILTER_ALPHA) * wall_deriv_raw;
-//
-//            wall_correction = (Kp_wall * wall_error) +
-//                             (Ki_wall * wall_integral) +
-//                             (Kd_wall * wall_deriv_filt);
-//
-//            wall_error_prev = wall_error;
-//        }
-//    }
-//
-//    // --- SENSOR FUSION: COMBINE CORRECTIONS ---
-//    float total_correction;
-//
-//    if (wall_active) {
-//        // Blend gyro and wall corrections
-//        total_correction = (GYRO_WALL_BLEND_RATIO * gyro_correction) +
-//                          ((1.0f - GYRO_WALL_BLEND_RATIO) * wall_correction);
-//    } else {
-//        // Use gyro only
-//        total_correction = gyro_correction;
-//    }
-//
-//    // --- APPLY TO MOTORS ---
-//    int motor_left_speed = (int)roundf((float)base_pwm + total_correction);
-//    int motor_right_speed = (int)roundf((float)base_pwm - total_correction);
-//
-//    // Clamp motor speeds
-//    motor_left_speed = fmaxf(0, fminf(800, motor_left_speed));
-//    motor_right_speed = fmaxf(0, fminf(800, motor_right_speed));
-//
-//    // Apply to motors
-//    motor_set(0, true, (uint16_t)motor_left_speed);   // Left motor
-//    motor_set(1, true, (uint16_t)motor_right_speed);  // Right motor
-//
-//    // Optional debug output (comment out in final version)
-////    #ifdef WALL_FOLLOW_DEBUG
-////    static uint32_t debug_last = 0;
-////    if (now - debug_last > 50) {  // Debug every 50ms
-////        send_bluetooth_printf("WF: SL=%d SR=%d GC=%.1f WC=%.1f TC=%.1f M_L=%d M_R=%d\r\n",
-////                             sensors.side_left, sensors.side_right,
-////                             gyro_correction, wall_correction, total_correction,
-////                             motor_left_speed, motor_right_speed);
-////        debug_last = now;
-////    }
-////    #endif
-//}
-//
-///**
-// * @brief Move forward distance with sensor fusion
-// * Enhanced version that replaces move_forward_distance()
-// *
-// * @param target_counts Encoder counts to travel
-// * @param wall_mode Wall following mode
-// */
-//void move_forward_distance_fusion(int target_counts, WallFollowMode_t wall_mode) {
-//    // Reset encoders and PID controllers
-//    reset_encoder_totals();
-//    wallFollowPID_Reset();
-//
-//    int32_t start_left = get_left_encoder_total();
-//    int32_t start_right = get_right_encoder_total();
-//
-//    const int base_pwm = 650; // Adjust as needed
-//
-//    while (1) {
-//        // Use sensor fusion controller
-//        moveStraightSensorFusion(base_pwm, wall_mode);
-//
-//        // Check distance traveled
-//        int32_t current_left = get_left_encoder_total();
-//        int32_t current_right = get_right_encoder_total();
-//        int32_t left_traveled = current_left - start_left;
-//        int32_t right_traveled = current_right - start_right;
-//        int32_t avg_traveled = (left_traveled + right_traveled) / 2;
-//
-//        if (avg_traveled >= target_counts) {
-//            break;
-//        }
-//
-//        HAL_Delay(2); // 500Hz control loop
-//    }
-//
-//    break_motors();
-//    HAL_Delay(50); // Brief settling time
-//}
 
 
 

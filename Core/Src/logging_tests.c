@@ -377,6 +377,128 @@ void run_wall_single_left_step_test(int base_pwm, int delta_pwm,
 
 
 
+// ================= WF RELAY TEST (for Ku/Tu) =================
+// Paste into logging_tests.c (include headers you already use there)
+
+typedef enum { WF_MODE_BOTH = 0, WF_MODE_LEFT = 1, WF_MODE_RIGHT = 2 } wf_mode_t;
+
+static inline int clampi_(int v, int lo, int hi) {
+    return (v < lo) ? lo : (v > hi) ? hi : v;
+}
+static inline float signf_(float x) { return (x >= 0.0f) ? 1.0f : -1.0f; }
+
+/**
+ * Relay test for wall-following.
+ * mode        : 0=BOTH (corridor), 1=LEFT-only, 2=RIGHT-only
+ * base_pwm    : nominal forward PWM (e.g., 650–750)
+ * relay_pwm   : ΔPWM magnitude per side (e.g., 100–140). Keep base±relay in [PWM_MIN_MOVE..PWM_MAX]
+ * sample_ms   : log sample interval (10 ms is fine)
+ * total_ms    : total duration (12–18 s typical)
+ * warm_ms     : only for single-wall; capture target from first ~300 ms
+ *
+ * CSV header:
+ *   t_ms,u,L_raw,R_raw,FL,FR,Lpwm,Rpwm,gz,left_cnt,right_cnt
+ *
+ * Notes:
+ *   - u is normalized:  +relay_pwm/1000 or -relay_pwm/1000 (so analysis is unit-consistent)
+ *   - We purposely do NOT compute cm in firmware; Python does it from raw via the LUT.
+ */
+void run_wf_relay_test(int mode, int base_pwm, int relay_pwm,
+                       uint32_t sample_ms, uint32_t total_ms, uint32_t warm_ms)
+{
+    // ---- warm-up for single wall target (raw ADC average) ----
+    float target_left_raw  = 0.0f;
+    float target_right_raw = 0.0f;
+
+    uint32_t t0 = HAL_GetTick();
+    uint32_t now = t0;
+    uint32_t last = t0;
+    uint32_t next_log = t0;
+
+    // brief warm-up while motors are stopped
+    while ((now = HAL_GetTick()), (now - t0) < warm_ms) {
+        update_sensors();
+        if (mode == WF_MODE_LEFT)  target_left_raw  = 0.9f*target_left_raw  + 0.1f*(float)sensors.side_left;
+        if (mode == WF_MODE_RIGHT) target_right_raw = 0.9f*target_right_raw + 0.1f*(float)sensors.side_right;
+        HAL_Delay(2);
+    }
+
+    // if no warm-up samples (e.g., BOTH mode), fall back to current read
+    if (mode == WF_MODE_LEFT  && target_left_raw  <= 0.5f) target_left_raw  = (float)sensors.side_left;
+    if (mode == WF_MODE_RIGHT && target_right_raw <= 0.5f) target_right_raw = (float)sensors.side_right;
+
+    // start moving forward
+    send_bluetooth_message("#WF_RELAY_TEST_START\r\n");
+    int lp = base_pwm, rp = base_pwm;
+    motor_set(0, true, (uint16_t)lp);
+    motor_set(1, true, (uint16_t)rp);
+
+    // encoder baseline
+    int32_t lcnt0 = get_left_encoder_total();
+    int32_t rcnt0 = get_right_encoder_total();
+
+    // Log header
+    log_printf("t_ms,u,L_raw,R_raw,FL,FR,Lpwm,Rpwm,gz,left_cnt,right_cnt\r\n");
+
+    while ((now = HAL_GetTick()), (now - t0) < total_ms) {
+        // 1) Sensors
+        update_sensors();
+        mpu9250_read_gyro();
+        float gz = mpu9250_get_gyro_z_compensated();
+
+        // 2) Sign of wall error (raw-domain sign only; analysis will re-create cm)
+        float s = 0.0f;
+        if (mode == WF_MODE_BOTH) {
+            // positive => closer to LEFT => slow left / speed right
+            s = signf_((float)sensors.side_left - (float)sensors.side_right);
+        } else if (mode == WF_MODE_LEFT) {
+            s = signf_(target_left_raw - (float)sensors.side_left);
+        } else { // RIGHT
+            s = signf_((float)sensors.side_right - target_right_raw);
+        }
+
+        // 3) Relay control (ΔPWM)
+        int d = (int)lroundf(s * (float)relay_pwm);
+
+        // mix around base (right=base + d, left=base - d)
+        rp = clampi_(base_pwm + d, 0, 1000);
+        lp = clampi_(base_pwm - d, 0, 1000);
+
+        // ensure we overcome stiction but don’t exceed max
+        if (rp > 0 && rp < 50) rp = 50;
+        if (lp > 0 && lp < 50) lp = 50;
+
+        motor_set(0, true, (uint16_t)lp);
+        motor_set(1, true, (uint16_t)rp);
+
+        // 4) Logging at fixed cadence
+        if (now >= next_log) {
+            float u_norm = (float)relay_pwm / 1000.0f * s;  // matches WF_U_SCALE=1000 convention
+            int32_t lcnt = get_left_encoder_total()  - lcnt0;
+            int32_t rcnt = get_right_encoder_total() - rcnt0;
+
+            log_printf("%lu,%.4f,%u,%u,%u,%u,%d,%d,%.3f,%ld,%ld\r\n",
+                       (unsigned long)(now - t0),
+                       u_norm,
+                       (unsigned int)sensors.side_left,
+                       (unsigned int)sensors.side_right,
+                       (unsigned int)sensors.front_left,
+                       (unsigned int)sensors.front_right,
+                       lp, rp, gz, (long)lcnt, (long)rcnt);
+
+            next_log += sample_ms;
+        }
+
+        // basic safety: don’t slam into a front wall (tune thresholds to your ADC scale if needed)
+        // if (sensors.front_left > 200 || sensors.front_right > 200) break;
+
+        // idle
+        HAL_Delay(1);
+    }
+
+    stop_motors();
+    send_bluetooth_message("#WF_RELAY_TEST_DONE\r\n");
+}
 
 
 
