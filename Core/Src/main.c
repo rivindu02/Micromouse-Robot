@@ -415,6 +415,7 @@ int main(void)
   //turn_left();
   //send_bluetooth_printf("%d",fusion_align_entry(650,4000));
 
+  //move_forward_distance_Profile(2560,2560);
 
 
   /* USER CODE END 2 */
@@ -443,6 +444,7 @@ int main(void)
 		} else if (is_exploration_complete()) {
 			send_bluetooth_message("\r\n🏁 EXPLORATION COMPLETE - Ready for speed run! 🏁\r\n");
 			send_performance_metrics();
+			//calculate_optimal_path_explored();
 
 		} else if (!system_ready) {
 			send_bluetooth_message("⚠️ System not ready - check diagnostics!\r\n");

@@ -178,10 +178,134 @@ void break_motors(void)
     stop_motors();   // Then coast
 }
 
+/**
+ * @brief Move forward a specific distance - FIXED VERSION hv to use with  more than 1380 encoder readings
+ */
+void move_forward_WF_distance_Profile(int Left_target_counts, int Right_target_counts)
+{
+	reset_encoder_totals();
+	int32_t start_left  = get_left_encoder_total();
+	int32_t start_right = get_right_encoder_total();
+	// 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
+	//int mode = 0;               // WF_AUTO
+	//int base_pwm = 650;         // UPDATEDDDDDDDDDDDDDDDDDD
+
+	// bootstrap targets & reset integrators
+	//wall_follow_reset_int(mode, base_pwm);
+
+	fusion_align_entry(570, 3000);
+
+
+	fusion_reset();
+	fusion_set_heading_ref_to_current();  // lock the present heading
+
+	int distance_ticks = (Left_target_counts + Right_target_counts) / 2;
+
+	// === ACCELERATION PHASE ===
+	for (int pwm = 500; pwm < 1000; pwm++) {
+		fusion_step(/*base_pwm=*/pwm);  // 0 → uses WF_BASE_PWM; or pass an explicit base
+		dwt_delay_us(1000);
+
+		int32_t current_left  = get_left_encoder_total();
+		int32_t current_right = get_right_encoder_total();
+		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
+
+		if ((-1) * avg_traveled >= 1380) {
+			break;
+		}
+	}
+
+	// === CONSTANT SPEED PHASE ===
+	while (1) {
+		int32_t current_left  = get_left_encoder_total();
+		int32_t current_right = get_right_encoder_total();
+		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
+
+		if ((-1) * avg_traveled >= distance_ticks - 1380)  break;
+
+		fusion_step(/*base_pwm=*/1000);  // 0 → uses WF_BASE_PWM; or pass an explicit base
+		dwt_delay_us(1000);
+	}
+
+	// === DECELERATION PHASE ===
+	for (int pwm = 800; pwm > 200; pwm--) {
+		fusion_step(/*base_pwm=*/pwm);  // 0 → uses WF_BASE_PWM; or pass an expli
+		dwt_delay_us(900);
+
+		int32_t current_left  = get_left_encoder_total();
+		int32_t current_right = get_right_encoder_total();
+		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
+
+		if ((-1) * avg_traveled >= distance_ticks) {
+			break_motors();
+			//HAL_Delay(500);
+			break;
+		}
+	}
+}
+
+
 
 /**
- * @brief Move forward a specific distance - FIXED VERSION
+ * @brief Move forward a specific distance - FIXED VERSION hv to use with  more than 1380 encoder readings
  */
+void move_forward_distance_Profile(int Left_target_counts, int Right_target_counts)
+{
+	reset_encoder_totals();
+	int32_t start_left  = get_left_encoder_total();
+	int32_t start_right = get_right_encoder_total();
+	moveStraightGyroPID_Reset();
+
+	int distance_ticks = (Left_target_counts + Right_target_counts) / 2;
+
+	// === ACCELERATION PHASE ===
+	for (int pwm = 500; pwm < 1000; pwm++) {
+		mpu9250_read_gyro();
+		moveStraightGyroPID(pwm);  // apply PWM through gyro correction
+		dwt_delay_us(1000);
+
+		int32_t current_left  = get_left_encoder_total();
+		int32_t current_right = get_right_encoder_total();
+		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
+
+		if ((-1) * avg_traveled >= 1380) {
+			break;
+		}
+	}
+
+	// === CONSTANT SPEED PHASE ===
+	while (1) {
+		int32_t current_left  = get_left_encoder_total();
+		int32_t current_right = get_right_encoder_total();
+		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
+
+		if ((-1) * avg_traveled >= distance_ticks - 1380) {
+			break;
+		}
+
+		mpu9250_read_gyro();
+		moveStraightGyroPID(1000);  // Maintain max speed
+		dwt_delay_us(1000);
+	}
+
+	// === DECELERATION PHASE ===
+	for (int pwm = 800; pwm > 400; pwm--) {
+		mpu9250_read_gyro();
+		moveStraightGyroPID(pwm);
+		dwt_delay_us(1000);
+
+		int32_t current_left  = get_left_encoder_total();
+		int32_t current_right = get_right_encoder_total();
+		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
+
+		if ((-1) * avg_traveled >= distance_ticks) {
+			break_motors();
+			HAL_Delay(500);
+			break;
+		}
+	}
+}
+
 void move_forward_distance(int Left_target_counts,int Right_target_counts) {
 
     //  Use safe encoder reading
@@ -525,7 +649,7 @@ void moveStraightGyroPID(int pwm) {
     float correction = (Kp_g * error) + (Ki_g * pid_integral) + (Kd_g * pid_deriv_filt);
 
     /* Base PWM for forward motion (adjust to your nominal cruising PWM) */
-    int pwm = 570;
+    //int pwm = 570;
 
     int motor1Speed = (int)roundf((float)pwm - correction); // right wheel in your mapping
     int motor2Speed = (int)roundf((float)pwm + correction); // left wheel
@@ -545,66 +669,6 @@ void moveStraightGyroPID(int pwm) {
     /* store previous error for next derivative computation */
     pid_error_prev = error;
 }
-
-// S curve code
-void move_with_profile(int distance_ticks){
-	reset_encoder_totals();
-	int32_t start_left  = get_left_encoder_total();
-	int32_t start_right = get_right_encoder_total();
-
-
-
-	for (int i = 500; i < 1000; i++) {
-		motor_set(0, true, i);  // Left motor
-		motor_set(1, true, i);  // Right motor
-		dwt_delay_us(1000);  // 5 ms per step (tune this)
-
-		int32_t current_left  = get_left_encoder_total();
-		int32_t current_right = get_right_encoder_total();
-		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
-
-		if ((-1)*avg_traveled >= 1380) {
-			//break_motors();
-			//HAL_Delay(5000);
-			break;
-
-		}
-	}
-
-	while(1){
-		int32_t current_left  = get_left_encoder_total();
-		int32_t current_right = get_right_encoder_total();
-		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
-
-		if ((-1)*avg_traveled >= distance_ticks - 1380) {
-			//break_motors();
-			break;
-			//HAL_Delay(5000);
-		}
-		motor_set(0, true, 1000);  // Left motor
-		motor_set(1, true, 1000);  // Right motor
-
-		dwt_delay_us(1000);
-	}
-	for (int i = 800; i > 400; i--) {
-		motor_set(0, true, i);  // Left motor
-		motor_set(1, true, i);  // Right motor
-
-		dwt_delay_us(1000);  // 5 ms per step (tune this)
-
-		int32_t current_left  = get_left_encoder_total();
-		int32_t current_right = get_right_encoder_total();
-		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
-
-		if (avg_traveled*(-1) >= distance_ticks) {
-			break_motors();
-			HAL_Delay(5000);
-
-			break;
-		}
-	}
-}
-
 
 
 

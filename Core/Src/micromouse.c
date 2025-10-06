@@ -291,7 +291,9 @@ int get_best_direction(void) {
         for (int p = 0; p < 4; p++) {
             int dir = priority[p];
 
-            if (wall_state[robot.x][robot.y][dir] != WALL_OPEN) continue;
+            //if (wall_state[robot.x][robot.y][dir] != WALL_OPEN) continue;
+            if (wall_state[robot.x][robot.y][dir] == WALL_CLOSED) continue;
+
 
             int nx = robot.x + dx[dir];
             int ny = robot.y + dy[dir];
@@ -423,7 +425,8 @@ bool move_forward_one_cell_truns(void){
     		move_forward_WF_distance(1250,1250);
     		flag=0;
     	}else{
-    		move_forward_WF_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
+    		//move_forward_WF_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
+    		move_forward_WF_distance_Profile(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
     	}
 
 
@@ -433,7 +436,8 @@ bool move_forward_one_cell_truns(void){
 			move_forward_distance(1250 ,1250);
 			flag=0;
     	}else{
-    		move_forward_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
+    		move_forward_distance_Profile(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
+    		//move_forward_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
     	}
     }
 
@@ -682,3 +686,57 @@ int get_optimal_distance(void) {
     // For now, return the flood fill distance to center
     return maze[0][0].distance;
 }
+
+
+
+static int optimal_steps_explored = -1;
+
+static void calculate_optimal_path_explored(void) {
+    // reset distances
+    for (int x=0;x<MAZE_SIZE;x++)
+        for (int y=0;y<MAZE_SIZE;y++)
+            maze[x][y].distance = MAX_DISTANCE;
+
+    // seed from center cells that were actually visited
+    int cx0=(MAZE_SIZE/2)-1, cy0=(MAZE_SIZE/2)-1;
+    int gxs[4]={cx0,cx0+1,cx0,cx0+1}, gys[4]={cy0,cy0,cy0+1,cy0+1};
+    int seeded=0;
+    queue_init(&bfs_queue);
+    for (int i=0;i<4;i++){
+        int gx=gxs[i], gy=gys[i];
+        if (maze[gx][gy].visited) {
+            maze[gx][gy].distance = 0;
+            queue_push(&bfs_queue, (Position){gx,gy});
+            seeded=1;
+        }
+    }
+    if (!seeded) {
+        send_bluetooth_message("[ERROR] No goal cells were visited.\r\n");
+        optimal_steps_explored = -1;
+        return;
+    }
+
+    int updates=0;
+    while (!queue_empty(&bfs_queue)) {
+        Position p = queue_pop(&bfs_queue);
+        int x=p.x, y=p.y;
+        for (int dir=0; dir<4; dir++) {
+            if (wall_state[x][y][dir] == WALL_CLOSED) continue;   // CLOSED blocks (like sim)
+            int nx = x + dx[dir], ny = y + dy[dir];
+            if (nx<0||nx>=MAZE_SIZE||ny<0||ny>=MAZE_SIZE) continue;
+            if (!maze[nx][ny].visited) continue;                  // EXPLORED ONLY
+
+            int nd = maze[x][y].distance + 1;
+            if (nd < maze[nx][ny].distance) {
+                maze[nx][ny].distance = nd;
+                queue_push(&bfs_queue,(Position){nx,ny});
+                updates++;
+            }
+        }
+    }
+
+    optimal_steps_explored = maze[0][0].distance;
+    send_bluetooth_printf("[PATH] optimal steps (explored): %d | updates: %d\r\n",
+                          optimal_steps_explored, updates);
+}
+

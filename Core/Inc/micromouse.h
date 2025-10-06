@@ -153,6 +153,7 @@ void moveStraightPID_Reset(void);
 void moveStraightGyroPID(int pwm);
 void moveStraightGyroPID_Reset(void);
 void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms);
+void move_forward_distance_Profile(int Left_target_counts,int Right_target_counts);
 
 
 /* Wall Handle Functions */
@@ -303,7 +304,7 @@ void fusion_set_heading_ref_to_current(void);
 
 
 /* Function declarations */
-
+static void calculate_optimal_path_explored(void);
 /**
  * @brief Initialize maze for exploration
  * Sets up the maze data structure, boundary walls, center coordinates,
