@@ -36,8 +36,8 @@
 /* Sensor thresholds */
 #define WALL_THRESHOLD_FRONT_L 6   //2000
 #define WALL_THRESHOLD_FRONT_R 6
-#define WALL_THRESHOLD_SIDE_L 11      //1500
-#define WALL_THRESHOLD_SIDE_R 14
+#define WALL_THRESHOLD_SIDE_L 15      //1500
+#define WALL_THRESHOLD_SIDE_R 16
 #define BATTERY_LOW_THRESHOLD 3000
 #define IR_AMBIENT_THRESHOLD 500
 
@@ -84,6 +84,8 @@ typedef struct {
     bool wall_front;
     bool wall_left;
     bool wall_right;
+    bool wall_frontL;
+    bool wall_frontR;
 } SensorData;
 
 typedef struct {
@@ -159,6 +161,7 @@ void fusion_reset(void);
 void fusion_set_heading_ref_to_current(void);
 void wall_follow_reset_int(int mode, int base_pwm);
 void wall_follow_step(void);
+bool alignment(int base_pwm, uint32_t timeout_ms);
 
 
 

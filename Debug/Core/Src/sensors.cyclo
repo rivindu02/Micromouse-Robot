@@ -4,9 +4,9 @@
 ../Core/Src/sensors.c:130:17:measure_sync	5
 ../Core/Src/sensors.c:145:6:update_sensors4	8
 ../Core/Src/sensors.c:179:6:update_sensors	7
-../Core/Src/sensors.c:277:6:calibrate_sensors	19
-../Core/Src/sensors.c:501:6:is_sensor_calibration_valid	1
-../Core/Src/sensors.c:511:10:get_calibrated_threshold	5
-../Core/Src/sensors.c:527:6:send_detailed_sensor_status	5
-../Core/Src/sensors.c:570:6:adc_system_diagnostics	9
-../Core/Src/sensors.c:614:6:diagnostic_sensor_test	2
+../Core/Src/sensors.c:279:6:calibrate_sensors	19
+../Core/Src/sensors.c:503:6:is_sensor_calibration_valid	1
+../Core/Src/sensors.c:513:10:get_calibrated_threshold	5
+../Core/Src/sensors.c:529:6:send_detailed_sensor_status	5
+../Core/Src/sensors.c:572:6:adc_system_diagnostics	9
+../Core/Src/sensors.c:616:6:diagnostic_sensor_test	2

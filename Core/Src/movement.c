@@ -229,7 +229,7 @@ void move_forward_WF_distance(int Left_target_counts,int Right_target_counts) {
     // bootstrap targets & reset integrators
     wall_follow_reset_int(mode, base_pwm);
 
-    fusion_align_entry(600, 3000);
+    fusion_align_entry(570, 3000);
 
 
     fusion_reset();

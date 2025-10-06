@@ -290,6 +290,7 @@ bool align_front_to_wall(int base_pwm, uint32_t timeout_ms)
 
         // --- drive / brake ---
         if (cmd_left == 0 && cmd_right == 0) {
+
             break_motors();  // actively short the motors to kill drift
         } else {
             bool lfwd = (cmd_left  >= 0);
@@ -298,6 +299,7 @@ bool align_front_to_wall(int base_pwm, uint32_t timeout_ms)
             uint16_t rduty = (uint16_t)abs(cmd_right);
             motor_set(0, lfwd, lduty);
             motor_set(1, rfwd, rduty);
+
         }
 
         // --- dwell-based success ---
@@ -319,7 +321,122 @@ bool align_front_to_wall(int base_pwm, uint32_t timeout_ms)
     }
 }
 
+bool alignment(int base_pwm, uint32_t timeout_ms)
+{
+    // ---- Your gains (unchanged) ----
 
+    const float Kp_a = 1.0f, Ki_a = 0.1f;   // angle PI
+
+    // ---- Small bias to kill steady left drift (counts). Try 0, then -1 or -2 if it still nudges left. ----
+
+
+    // ---- Finish criteria (unchanged) ----
+    const int   DIST_TOL = 10;         // counts
+    const int   ANG_TOL  = 12;         // counts
+    const uint32_t STABLE_DWELL_MS = 150;
+
+    // ---- Output constraints (unchanged idea) ----
+    const int PWM_MAX = base_pwm;      // clamp final wheel cmds
+    const int PWM_MIN_MOVE = 500;      // measured deadzone threshold
+
+    // Integrators
+    float I_d = 0.0f, I_a = 0.0f;
+
+    uint32_t t0 = HAL_GetTick();
+    uint32_t last_ok = 0;
+    uint32_t last_tick = HAL_GetTick();
+
+    // reset motors
+    motor_set(0, true, 0);
+    motor_set(1, true, 0);
+
+    while (1) {
+        // --- timing / dt ---
+        uint32_t now = HAL_GetTick();
+        float dt = (now - last_tick) / 1000.0f;
+        if (dt <= 0) dt = 0.001f;
+        last_tick = now;
+
+        // --- sensors ---
+        update_sensors();
+        int FL = (int)sensors.front_left;
+        int FR = (int)sensors.front_right;
+
+        // --- errors (raw counts) ---
+        int eL = FL - (int)target_align;
+        int eR = FR - (int)target_align;
+
+        // distance = average; angle = left-right diff (+ means left closer). Add tiny bias to cancel drift.
+        float e_ang  = (float)(eL - eR)*100;
+
+        // --- PI controllers ---
+
+        I_a += e_ang  * dt;
+
+        // simple clamps to keep integrators sane
+        if (I_a > 100.0f) I_a = 100.0f;
+        if (I_a < -100.0f) I_a = -100.0f;
+
+        float w = Kp_a * e_ang  + Ki_a * I_a;  // turn command          (- = turn right, + = left)
+
+        // per-wheel raw commands (signed) — keep your mixing/signs
+        int cmd_left  = (int)lroundf(-w);
+        int cmd_right = (int)lroundf(w);
+
+        // saturate
+        cmd_left  = clampi_local(cmd_left,  -PWM_MAX, PWM_MAX);
+        cmd_right = clampi_local(cmd_right, -PWM_MAX, PWM_MAX);
+
+        // --- convergence check *before* applying min-move ---
+        bool ang_ok  = (abs((int)lroundf(e_ang))  <= ANG_TOL);
+        bool nearly_done = (ang_ok);
+
+        // --- stiction handling ---
+        // If we're NOT nearly done, enforce a minimum to break deadzone.
+        // If we ARE nearly done, DON'T enforce min move — brake instead to avoid creeping.
+        if (!nearly_done) {
+            if (cmd_left > 0  && cmd_left  < PWM_MIN_MOVE) cmd_left  = PWM_MIN_MOVE;
+            if (cmd_left < 0  && -cmd_left < PWM_MIN_MOVE) cmd_left  = -PWM_MIN_MOVE;
+            if (cmd_right > 0 && cmd_right < PWM_MIN_MOVE) cmd_right = PWM_MIN_MOVE;
+            if (cmd_right < 0 && -cmd_right < PWM_MIN_MOVE) cmd_right = -PWM_MIN_MOVE;
+        } else {
+            // close enough: stop and actively brake so it doesn't coast/creep left
+            cmd_left = 0;
+            cmd_right = 0;
+        }
+
+        // --- drive / brake ---
+        if (cmd_left == 0 && cmd_right == 0) {
+
+            break_motors();  // actively short the motors to kill drift
+        } else {
+            bool lfwd = (cmd_left  >= 0);
+            bool rfwd = (cmd_right >= 0);
+            uint16_t lduty = (uint16_t)abs(cmd_left);
+            uint16_t rduty = (uint16_t)abs(cmd_right);
+            motor_set(0, lfwd, lduty);
+            motor_set(1, rfwd, rduty);
+
+        }
+
+        // --- dwell-based success ---
+        if (nearly_done) {
+            if (last_ok == 0) last_ok = now;
+            if ((now - last_ok) >= STABLE_DWELL_MS) {
+                break_motors();
+                return true;
+            }
+        } else {
+            last_ok = 0;
+        }
+
+        // --- timeout ---
+        if ((now - t0) > timeout_ms) {
+            break_motors();
+            return false;
+        }
+    }
+}
 
 
 
@@ -657,7 +774,7 @@ while (1) {
 
 // ---------- Tunables ----------
 static int   WF_BASE_PWM        = 500;     // cruise PWM
-static int   WF_PWM_MIN_MOVE    = 50;      // overcome stiction
+static int   WF_PWM_MIN_MOVE    = 450;      // overcome stiction
 static int   WF_PWM_MAX         = 1000;    // clamp
 
 // PID gains (your tuned values)
@@ -1196,6 +1313,7 @@ void fusion_step(int base_pwm)
 //    if (u_wall < -wall_cap) u_wall = -wall_cap;
 
     // final correction
+    if (sensors.side_left>40 || sensors.side_right>40) fus_conf_s=1.0f;
     float u = fus_conf_s * u_wall + (1.0f - fus_conf_s) * u_head;
 
     // optional rate limiting on correction to avoid jerk
@@ -1239,116 +1357,289 @@ static float lut_lookup_lin_local(int raw, const int *adc_table, const float *di
     return dist_table[size-1];
 }
 
+// Optional wheel balance scalers (1.0 = no correction); tune if it creeps
+#ifndef SPIN_BAL_L
+#define SPIN_BAL_L 1.00f
+#endif
+#ifndef SPIN_BAL_R
+#define SPIN_BAL_R 1.00f
+#endif
+
+bool fusion_align_entry2(int base_pwm, uint32_t timeout_ms)
+{
+
+// --- PD gains in PWM units ---
+	const float KP_PWM_PER_CM    = 600.0f;   // ↑ from 500 → stronger shove
+	const float KD_PWM_PER_CMPS  = 140.0f;   // a bit more damping
+	const float D_ALPHA          = 0.92f;    // smoother derivative
+
+
+	// Stiction kick & limits
+	const int   SPIN_PWM_MAX     = clampi_local(WF_PWM_MAX/2, WF_PWM_MIN_MOVE, WF_PWM_MAX);
+	const int   SPIN_PWM_MIN     = WF_PWM_MIN_MOVE;
+	const int   KICK_PWM         = SPIN_PWM_MIN + 120; // initial shove
+	const uint32_t KICK_MS       = 120;                // duration for kick after start
+	const int   DU_RATE_LIMIT    = 180;                // allow faster rise (or set 0 to disable)
+	const int PWM_MIN_MOVE = 500;
+
+	const int PWM_MAX = base_pwm;
+	// Stop conditions (loosen slightly so it doesn’t immediately “done→brake”)
+	const float DIFF_TOL_CM      = 0.20f;   // both walls
+	const float DIST_TOL_CM      = 0.25f;   // single wall
+	const uint32_t STABLE_DWELL_MS = 150;
+	const int   ANG_TOL  = 12;
+
+	// Seed targets from current readings (single-wall)
+	update_sensors();
+	//float target_left_cm  = lut_lookup_lin_local(sensors.side_left,  left_adc,  left_dist,  L_LUT_SIZE);
+	//float target_right_cm = lut_lookup_lin_local(sensors.side_right, right_adc, right_dist, R_LUT_SIZE);
+
+	float e_prev = 0.0f, d_filt = 0.0f, u_prev = 0.0f;
+	uint32_t t0 = HAL_GetTick(), last = t0, last_ok = 0;
+	bool Lw = sensors.wall_left;
+	bool Rw = sensors.wall_right;
+	bool FL= sensors.wall_frontL;
+	bool FR= sensors.wall_frontR;
+
+
+	if (!Lw && !Rw) { break_motors(); return false; }
+
+	while ((HAL_GetTick() - t0) < timeout_ms) {
+		uint32_t now = HAL_GetTick();
+		float dt = (now - last) * 0.001f; if (dt <= 0.0f) dt = 0.001f;
+		last = now;
+
+		update_sensors();
+		bool Lw = sensors.wall_left;
+		bool Rw = sensors.wall_right;
+		bool FL= sensors.wall_frontL;
+		bool FR= sensors.wall_frontR;
+
+		// Maintain requirement: at least one side wall; if both drop, stop
+		if (!Lw && !Rw) { break_motors(); return false; }
+
+		float Lcm = lut_lookup_lin_local(sensors.side_left,  left_adc,  left_dist,  L_LUT_SIZE);
+		float Rcm = lut_lookup_lin_local(sensors.side_right, right_adc, right_dist, R_LUT_SIZE);
+
+
+		// Error
+		float e_cm, tol_cm;
+		if (Lw && Rw) {
+			e_cm  = (Rcm - Lcm);      // +e → need to turn right
+
+		} else if (Lw) {
+			e_cm  = (Lcm-target_left);   // +e if too near left wall
+
+
+		} else { // Rw
+			e_cm  = (Rcm - target_right);  // +e if too far from right wall
+
+		}
+
+		// PD
+		float d_raw = (e_cm - e_prev) / dt;
+		d_filt = D_ALPHA*d_filt + (1.0f - D_ALPHA)*d_raw;
+		e_prev = e_cm;
+
+		float u = KP_PWM_PER_CM*e_cm + KD_PWM_PER_CMPS*d_filt; // signed PWM
+
+		u=clampi_local(u,  -PWM_MAX, PWM_MAX);
+
+		bool ang_ok  = (abs((int)lroundf(e_cm*100))  <= ANG_TOL);
+
+		if (!ang_ok) {
+			if (u > 0  && u  < PWM_MIN_MOVE) u  = PWM_MIN_MOVE;
+			if (u < 0  && -u < PWM_MIN_MOVE) u  = -PWM_MIN_MOVE;
+
+		} else {
+			// close enough: stop and actively brake so it doesn't coast/creep left
+			u = 0;
+		}
+
+		if (u=0) break_motors();
+		else{
+			bool lfwd =(u>=0);
+			uint16_t duty = (uint16_t)abs(u);
+			motor_set(0, lfwd, duty);
+			motor_set(1, !lfwd, duty);
+		}
+
+
+		// --- dwell-based success ---
+		if (ang_ok) {
+			if (last_ok == 0) last_ok = now;
+			if ((now - last_ok) >= STABLE_DWELL_MS) {
+				break_motors();
+				return true;
+			}
+		} else {
+			last_ok = 0;
+		}
+
+
+	}
+
+	// timeout
+	break_motors();
+	return false;
+
+}
+
+
 bool fusion_align_entry(int base_pwm, uint32_t timeout_ms)
 {
-    update_sensors();
+    // ---- Your gains (unchanged) ----
 
-    // --- Case A: front wall → reuse your align (most reliable) ---
-//    if (sensors.wall_front) {
-//        int base = (base_pwm > 0) ? base_pwm : WF_BASE_PWM;
-//        if (base > 450) base = 450;                 // conservative forward during align
-//        bool ok = align_front_to_wall(base, timeout_ms);
-//        break_motors();
-//        return ok;
-//    }
+    const float Kp_a = 10.0f, Ki_a = 0.1f;   // angle PI
 
-    // --- Case B: side-based yaw snap ---
-    // Tunables (start here; adjust in-field if needed)
-    const float DIFF_TOL_CM  = 0.15f;   // both walls: stop when |L-R| < 0.15 cm
-    const float DIST_TOL_CM  = 0.20f;   // single wall: stop when |target - side| < 0.20 cm
-    const float K_DIFF2RATE  = 220.0f;  // deg/s per cm for (R-L)
-    const float K_DIST2RATE  = 180.0f;  // deg/s per cm for single-wall distance error
-    const float OMEGA_MAX    = 360.0f;  // cap |desired yaw rate| in deg/s
-    const int   BASE_ALIGN   = (base_pwm > 0) ? base_pwm : WF_BASE_PWM;
-    const int   base_align_fwd = (BASE_ALIGN * 55) / 100; // less forward travel
-    const uint32_t DWELL_OK_MS = 80;
+    // ---- Small bias to kill steady left drift (counts). Try 0, then -1 or -2 if it still nudges left. ----
 
-    fus_theta_local = 0.0f;
+
+    // ---- Finish criteria (unchanged) ----
+    const int   DIST_TOL = 10;         // counts
+    const int   ANG_TOL  = 12;         // counts
+    const uint32_t STABLE_DWELL_MS = 150;
+
+    // ---- Output constraints (unchanged idea) ----
+    const int PWM_MAX = base_pwm;      // clamp final wheel cmds
+    const int PWM_MIN_MOVE = 500;      // measured deadzone threshold
+
+    // Integrators
+    float I_d = 0.0f, I_a = 0.0f;
+
     uint32_t t0 = HAL_GetTick();
     uint32_t last_ok = 0;
-    uint32_t last = t0;
+    uint32_t last_tick = HAL_GetTick();
 
-    while ((HAL_GetTick() - t0) < timeout_ms) {
+    update_sensors();
+            //float target_left_cm  = lut_lookup_lin_local(sensors.side_left,  left_adc,  left_dist,  L_LUT_SIZE);
+            //float target_right_cm = lut_lookup_lin_local(sensors.side_right, right_adc, right_dist, R_LUT_SIZE);
+
+	float e_prev = 0.0f, d_filt = 0.0f, u_prev = 0.0f;
+	bool Lw = sensors.wall_left;
+	bool Rw = sensors.wall_right;
+	bool FL= sensors.wall_frontL;
+	bool FR= sensors.wall_frontR;
+
+	if (!Lw && !Rw) { break_motors(); return false; }
+
+    // reset motors
+    motor_set(0, true, 0);
+    motor_set(1, true, 0);
+
+    while (1) {
+        // --- timing / dt ---
         uint32_t now = HAL_GetTick();
-        float dt = (now - last) * 0.001f; if (dt <= 0.0f) dt = 0.001f;
-        last = now;
+        float dt = (now - last_tick) / 1000.0f;
+        if (dt <= 0) dt = 0.001f;
+        last_tick = now;
 
+        // --- sensors ---
         update_sensors();
-        const bool Lw = sensors.wall_left;
-        const bool Rw = sensors.wall_right;
 
-        float Lcm = lut_lookup_lin_local(sensors.side_left,  left_adc,  left_dist,  L_LUT_SIZE);
-        float Rcm = lut_lookup_lin_local(sensors.side_right, right_adc, right_dist, R_LUT_SIZE);
+		bool Lw = sensors.wall_left;
+		bool Rw = sensors.wall_right;
+		bool FL= sensors.wall_frontL;
+		bool FR= sensors.wall_frontR;
 
-        // gyro integration
-        mpu9250_read_gyro();
-        float gz = mpu9250_get_gyro_z_compensated(); // deg/s
-        fus_theta_local += gz * dt;
+		// Maintain requirement: at least one side wall; if both drop, stop
+//		if (!Lw && !Rw) { break_motors(); return false; }
 
-        // decide desired yaw rate
-        float sp_rate = 0.0f;
-        bool done = false;
+		float Lcm = lut_lookup_lin_local(sensors.side_left,  left_adc,  left_dist,  L_LUT_SIZE);
+		float Rcm = lut_lookup_lin_local(sensors.side_right, right_adc, right_dist, R_LUT_SIZE);
 
-        if (Lw && Rw) {
-            float e_diff = (Rcm - Lcm); // + if right is farther → turn right
-            if (fabsf(e_diff) < DIFF_TOL_CM) {
-                done = true;
-            } else {
-                sp_rate = K_DIFF2RATE * e_diff;
-            }
-        } else if (Lw) {
-            float eL = (target_left-Lcm);  // + if too near left wall
-            if (fabsf(eL) < DIST_TOL_CM) {
-                done = true;
-            } else {
-                sp_rate = K_DIST2RATE * eL;
-            }
-        } else if (Rw) {
-            float eR = (target_right-Rcm); // + if too far from right wall
-            if (fabsf(eR) < DIST_TOL_CM) {
-                done = true;
-            } else {
-                sp_rate = K_DIST2RATE * eR;
-            }
-        } else {
-            // no side info → nothing to align with
-            break;
+
+		// Error
+		float e_ang;
+		if (Lw && Rw) {
+			//e_ang  = (Rcm - Lcm)*100;      // +e → need to turn right
+			e_ang  = (Lcm-2.7)*100;
+
+		} else if (Lw) {
+			//e_ang  = (Lcm-target_left)*100;   // +e if too near left wall
+			e_ang  = (Lcm-2.7)*100;
+
+
+		} else { // Rw
+			//e_ang  = (Rcm - target_right)*100;  // +e if too far from right wall
+			e_ang  = (Rcm - 2.7)*100;
+
+		}
+
+
+        // --- PI controllers ---
+
+        I_a += e_ang  * dt;
+
+        // simple clamps to keep integrators sane
+        if (I_a > 100.0f) I_a = 100.0f;
+        if (I_a < -100.0f) I_a = -100.0f;
+
+        float w = Kp_a * e_ang  + Ki_a * I_a;  // turn command          (- = turn right, + = left)
+        int cmd_left;
+        int cmd_right;
+
+        // per-wheel raw commands (signed) — keep your mixing/signs
+        if (Lw){
+            cmd_left  = (int)lroundf(-w);
+            cmd_right = (int)lroundf(w);
+        }else if (Rw){
+            cmd_left  = (int)lroundf(w);
+            cmd_right = (int)lroundf(-w);
         }
 
-        // cap rate
-        if (sp_rate >  OMEGA_MAX) sp_rate =  OMEGA_MAX;
-        if (sp_rate < -OMEGA_MAX) sp_rate = -OMEGA_MAX;
 
-        // run your calibrated rate PID (returns PWM-like correction)
-        float dummy_dt = dt;
-        float u = gyro_rate_pid_step(sp_rate, gz, &dummy_dt);
+        // saturate
+        cmd_left  = clampi_local(cmd_left,  -PWM_MAX, PWM_MAX);
+        cmd_right = clampi_local(cmd_right, -PWM_MAX, PWM_MAX);
 
-        // motor mix with low forward to keep distance short
-        int pwm_r = base_align_fwd + (int)lroundf(u);
-        int pwm_l = base_align_fwd - (int)lroundf(u);
+        // --- convergence check *before* applying min-move ---
+        bool ang_ok  = (abs((int)lroundf(e_ang))  <= ANG_TOL);
+        bool nearly_done = (ang_ok);
 
-        pwm_r = clampi_local(pwm_r, 0, WF_PWM_MAX);
-        pwm_l = clampi_local(pwm_l, 0, WF_PWM_MAX);
-        if (pwm_r > 0 && pwm_r < WF_PWM_MIN_MOVE) pwm_r = WF_PWM_MIN_MOVE;
-        if (pwm_l > 0 && pwm_l < WF_PWM_MIN_MOVE) pwm_l = WF_PWM_MIN_MOVE;
+        // --- stiction handling ---
+        // If we're NOT nearly done, enforce a minimum to break deadzone.
+        // If we ARE nearly done, DON'T enforce min move — brake instead to avoid creeping.
+        if (!nearly_done) {
+            if (cmd_left > 0  && cmd_left  < PWM_MIN_MOVE) cmd_left  = PWM_MIN_MOVE;
+            if (cmd_left < 0  && -cmd_left < PWM_MIN_MOVE) cmd_left  = -PWM_MIN_MOVE;
+            if (cmd_right > 0 && cmd_right < PWM_MIN_MOVE) cmd_right = PWM_MIN_MOVE;
+            if (cmd_right < 0 && -cmd_right < PWM_MIN_MOVE) cmd_right = -PWM_MIN_MOVE;
+        } else {
+            // close enough: stop and actively brake so it doesn't coast/creep left
+            cmd_left = 0;
+            cmd_right = 0;
+        }
 
-        motor_set(0, true, (uint16_t)pwm_l);
-        motor_set(1, true, (uint16_t)pwm_r);
+        // --- drive / brake ---
+        if (cmd_left == 0 && cmd_right == 0) {
 
-        // require small error to persist briefly
-        if (done) {
+            break_motors();  // actively short the motors to kill drift
+        } else {
+            bool lfwd = (cmd_left  >= 0);
+            bool rfwd = (cmd_right >= 0);
+            uint16_t lduty = (uint16_t)abs(cmd_left);
+            uint16_t rduty = (uint16_t)abs(cmd_right);
+            motor_set(0, lfwd, lduty);
+            motor_set(1, rfwd, rduty);
+
+        }
+
+        // --- dwell-based success ---
+        if (nearly_done) {
             if (last_ok == 0) last_ok = now;
-            if (now - last_ok >= DWELL_OK_MS) {
+            if ((now - last_ok) >= STABLE_DWELL_MS) {
                 break_motors();
                 return true;
             }
         } else {
             last_ok = 0;
         }
+
+        // --- timeout ---
+        if ((now - t0) > timeout_ms) {
+            break_motors();
+            return false;
+        }
     }
-
-    break_motors();
-    return true; // timeout → still proceed to fusion
 }
-
-

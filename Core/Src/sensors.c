@@ -253,6 +253,8 @@ void update_sensors(void){
         // Fallback to static thresholds
         sensors.wall_front = (sensors.front_left > WALL_THRESHOLD_FRONT_L) ||
                             (sensors.front_right > WALL_THRESHOLD_FRONT_R);
+        sensors.wall_frontL= (sensors.front_left > WALL_THRESHOLD_FRONT_L);
+        sensors.wall_frontR= (sensors.front_right > WALL_THRESHOLD_FRONT_R);
         sensors.wall_left = (sensors.side_left > WALL_THRESHOLD_SIDE_L);
         sensors.wall_right = (sensors.side_right > WALL_THRESHOLD_SIDE_R);
     }

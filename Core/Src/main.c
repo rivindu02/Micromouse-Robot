@@ -377,7 +377,7 @@ int main(void)
 
 	//fusion_reset();
 	//fusion_set_heading_ref_to_current();  // lock the present heading
-	fusion_align_entry(600, 3000);
+	//fusion_align_entry(600, 3000);
 
 //	while(1){
 //		fusion_step(/*base_pwm=*/650);  // 0 → uses WF_BASE_PWM; or pass an explicit base
@@ -413,6 +413,7 @@ int main(void)
   //run_wf_relay_test(1, 700, 120, 10, 6000, 300);
 
   //turn_left();
+  //send_bluetooth_printf("%d",fusion_align_entry(650,4000));
 
 
 
