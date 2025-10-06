@@ -363,7 +363,7 @@ int main(void)
 
   // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
 //  int mode = 0;               // WF_AUTO
-//  int base_pwm = 570;         // use the speed you tuned at
+//  int base_pwm = 650;         // use the speed you tuned at
 //
 //    // bootstrap targets & reset integrators
 //  	wall_follow_reset_int(mode, base_pwm);
@@ -373,6 +373,15 @@ int main(void)
 //		//HAL_Delay(200);           // keep a steady loop
 //		dwt_delay_us(50);
 //
+//	}
+
+	//fusion_reset();
+	//fusion_set_heading_ref_to_current();  // lock the present heading
+	fusion_align_entry(600, 3000);
+
+//	while(1){
+//		fusion_step(/*base_pwm=*/650);  // 0 → uses WF_BASE_PWM; or pass an explicit base
+//		dwt_delay_us(50);
 //	}
   //turn_left();
 
@@ -396,20 +405,12 @@ int main(void)
 //	  HAL_Delay(500);
 //  }
 
-//  run_wall_single_left_step_test(   // correct one to use with one wall
-//      /*base_pwm=*/650,
-//      /*delta_pwm=*/150,
-//      /*step_delay_ms=*/1000,
-//      /*step_duration_ms=*/2000,
-//      /*sample_ms=*/10,      // 100 Hz; use 20 if BLE is slow
-//      /*total_ms=*/6000
-//  );
 
+  // BOTH walls in a corridor
+  //run_wf_relay_test(/*mode=*/0, /*base_pwm=*/700, /*relay_pwm=*/120,/*sample_ms=*/10, /*total_ms=*/15000, /*warm_ms=*/300);
 
-  //  run_wall_lateral_step_test(
-  //      /*base_pwm=*/500,   /*delta_pwm=*/150,
-  //      /*step_delay_ms=*/1000, /*step_duration_ms=*/2000,
-  //      /*sample_ms=*/10,   /*total_ms=*/6000);
+  // For single-wall tuning (left):
+  //run_wf_relay_test(1, 700, 120, 10, 6000, 300);
 
   //turn_left();
 

@@ -354,7 +354,7 @@ bool move_forward_one_cell_truns(void){
     }
     else if (sensors.wall_left || sensors.wall_right){
     	if (flag==1){
-    		move_forward_WF_distance(1200,1200);
+    		move_forward_WF_distance(1250,1250);
     		flag=0;
     	}else{
     		move_forward_WF_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
@@ -364,7 +364,7 @@ bool move_forward_one_cell_truns(void){
 
     }else{
     	if (flag==1){
-			move_forward_distance(1200 ,1200);
+			move_forward_distance(1250 ,1250);
 			flag=0;
     	}else{
     		move_forward_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);

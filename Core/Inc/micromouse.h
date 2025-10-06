@@ -17,7 +17,7 @@
 #include <math.h>    // For fabsf(), sqrtf()
 
 /* Maze configuration */
-#define MAZE_SIZE 16
+#define MAZE_SIZE 12
 #define MAX_DISTANCE 9999
 #define CELL_SIZE_MM 180.0f
 
@@ -29,8 +29,8 @@
 
 /* Movement parameters */
 
-#define LEFT_ENCODER_COUNTS_PER_CELL 2460		// Updated
-#define RIGHT_ENCODER_COUNTS_PER_CELL 2460
+#define LEFT_ENCODER_COUNTS_PER_CELL 2500		// Must updateeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeed
+#define RIGHT_ENCODER_COUNTS_PER_CELL 2500
 #define ENCODER_COUNTS_PER_TURN 500
 
 /* Sensor thresholds */
@@ -143,6 +143,7 @@ void turn_around(void);
 void stop_motors(void);
 void break_motors(void);
 void move_forward_distance(int Left_target_counts,int Right_target_counts);
+void move_forward_WF_distance(int Left_target_counts,int Right_target_counts);
 void test_motors_individual(void);
 void motor_set(uint8_t motor, bool forward, uint16_t duty);
 void moveStraightPID(int base_pwm, bool left_forward, bool right_forward);
@@ -168,6 +169,8 @@ void run_encoder_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, 
 void run_gyro_turn_step_test(int base_pwm, int delta_pwm, uint32_t step_delay_ms, uint32_t step_duration_ms,uint32_t sample_ms, uint32_t total_ms);
 void run_wall_lateral_step_test(int base_pwm, int delta_pwm,uint32_t step_delay_ms, uint32_t step_duration_ms,uint32_t sample_ms, uint32_t total_ms);
 void run_wall_single_left_step_test(int base_pwm, int delta_pwm,uint32_t step_delay_ms, uint32_t step_duration_ms,uint32_t sample_ms, uint32_t total_ms);
+void run_wf_relay_test(int mode, int base_pwm, int relay_pwm,uint32_t sample_ms, uint32_t total_ms, uint32_t warm_ms);
+
 
 /* Sensor functions */
 void calibrate_sensors(void);
@@ -289,7 +292,11 @@ typedef enum {
 void wallFollowPID_Reset(void);
 void moveStraightSensorFusion(int base_pwm, WallFollowMode_t wall_mode);
 void move_forward_distance_fusion(int target_counts, WallFollowMode_t wall_mode);
+void fusion_step(int base_pwm);
+bool fusion_align_entry(int base_pwm, uint32_t timeout_ms);
 
+void fusion_reset(void);
+void fusion_set_heading_ref_to_current(void);
 
 
 /* Function declarations */

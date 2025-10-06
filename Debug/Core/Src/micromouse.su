@@ -8,8 +8,8 @@
 ../Core/Src/micromouse.c:133:6:flood_fill_algorithm	104	static
 ../Core/Src/micromouse.c:194:5:get_best_direction	80	static
 ../Core/Src/micromouse.c:264:6:turn_to_direction	24	static
-../Core/Src/micromouse.c:304:6:move_forward_one_cell	16	static
-../Core/Src/micromouse.c:336:6:move_forward_one_cell_truns	16	static
+../Core/Src/micromouse.c:304:6:move_forward_one_cell	24	static
+../Core/Src/micromouse.c:336:6:move_forward_one_cell_truns	24	static
 ../Core/Src/micromouse.c:393:6:is_at_goal	4	static
 ../Core/Src/micromouse.c:407:6:update_maze_walls	72	static
 ../Core/Src/micromouse.c:466:6:explore_maze	40	static

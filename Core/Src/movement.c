@@ -174,7 +174,7 @@ void break_motors(void)
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_3, 1000);  // Right IN3 = HIGH
     __HAL_TIM_SET_COMPARE(&htim3, TIM_CHANNEL_4, 1000);  // Right IN4 = HIGH
 
-    HAL_Delay(20);  // Hold brake briefly
+    HAL_Delay(200);  // Hold brake briefly
     stop_motors();   // Then coast
 }
 
@@ -184,7 +184,7 @@ void break_motors(void)
  */
 void move_forward_distance(int Left_target_counts,int Right_target_counts) {
 
-    // FIXED: Use safe encoder reading
+    //  Use safe encoder reading
 	reset_encoder_totals();
     int32_t start_left = get_left_encoder_total();
     int32_t start_right = get_right_encoder_total();
@@ -224,13 +224,21 @@ void move_forward_WF_distance(int Left_target_counts,int Right_target_counts) {
     int32_t start_right = get_right_encoder_total();
     // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
     int mode = 0;               // WF_AUTO
-    int base_pwm = 600;         // UPDATEDDDDDDDDDDDDDDDDDD
+    int base_pwm = 650;         // UPDATEDDDDDDDDDDDDDDDDDD
 
     // bootstrap targets & reset integrators
     wall_follow_reset_int(mode, base_pwm);
 
+    fusion_align_entry(600, 3000);
+
+
+    fusion_reset();
+    fusion_set_heading_ref_to_current();  // lock the present heading
+
     while (1) {
-    	wall_follow_step();     // computes e, PID, sets motor PWMs
+    	fusion_step(/*base_pwm=*/650);  // 0 → uses WF_BASE_PWM; or pass an explicit base
+
+    	//wall_follow_step();     // computes e, PID, sets motor PWMs
 		//HAL_Delay(200);           // keep a steady loop
 		dwt_delay_us(50);
 
@@ -246,16 +254,13 @@ void move_forward_WF_distance(int Left_target_counts,int Right_target_counts) {
         if (left_traveled>=Left_target_counts || right_traveled>=Right_target_counts) {
             break;
         }
-        HAL_Delay(1);
+        //HAL_Delay(1);
     }
-
     break_motors();		// use a S-curve to apply break/////////////////////
+    //move_forward_distance(Left_target_counts/2,Right_target_counts/2);
+
+
 }
-
-
-
-
-
 
 
 
@@ -584,7 +589,7 @@ void gyro_turn_reset(void) {
     pid_last_ms = HAL_GetTick();
 }
 
-static float gyro_rate_pid_step(float sp_dps, float meas_dps, float *p_dt) {
+float gyro_rate_pid_step(float sp_dps, float meas_dps, float *p_dt) {
     uint32_t now = HAL_GetTick();
     float dt = (now - pid_last_ms) / 1000.0f;
     if (dt <= 0.0f) dt = 0.002f;
