@@ -16,6 +16,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <math.h>
+#include <stdint.h>  // needed for int8_t
+
 
 
 /* Maze exploration state variables */
@@ -28,6 +30,22 @@ static int optimal_path_calculated = 0;
 typedef struct {
     int x, y;
 } Position;
+
+
+// ===== Tri-state wall map =====
+typedef enum { WALL_UNKNOWN = -1, WALL_OPEN = 0, WALL_CLOSED = 1 } WallState;
+static int8_t wall_state[MAZE_SIZE][MAZE_SIZE][4];
+
+// dx/dy must already exist; if not, you need the usual:
+///* static const int dx[4] = {0, 1, 0, -1};   // N,E,S,W
+//   static const int dy[4] = {1, 0, -1, 0}; */
+
+static inline void set_edge_state(int x, int y, int dir, WallState s){
+    wall_state[x][y][dir] = s;
+    int nx = x + dx[dir], ny = y + dy[dir];
+    if (nx>=0 && nx<MAZE_SIZE && ny>=0 && ny<MAZE_SIZE)
+        wall_state[nx][ny][(dir+2)%4] = s;
+}
 
 typedef struct {
     Position queue[QUEUE_MAX_SIZE];
@@ -85,18 +103,39 @@ void initialize_maze_exploration(void) {
 
             // Initialize all walls as unknown (false)
             for (int dir = 0; dir < 4; dir++) {
-                maze[x][y].walls[dir] = false;
+                //maze[x][y].walls[dir] = WALL_UNKNOWN; // was: false
+                maze[x][y].walls[dir]=false; // keep writing for legacy uses, but ignore in BFS
             }
         }
     }
 
-    // Set boundary walls
-    for (int i = 0; i < MAZE_SIZE; i++) {
-        maze[i][0].walls[SOUTH] = true;                    // Bottom boundary
-        maze[i][MAZE_SIZE-1].walls[NORTH] = true;          // Top boundary
-        maze[0][i].walls[WEST] = true;                     // Left boundary
-        maze[MAZE_SIZE-1][i].walls[EAST] = true;           // Right boundary
+    // Everything starts UNKNOWN
+    for (int x = 0; x < MAZE_SIZE; x++) {
+        for (int y = 0; y < MAZE_SIZE; y++) {
+            for (int d = 0; d < 4; d++) {
+                wall_state[x][y][d] = WALL_UNKNOWN;
+            }
+        }
     }
+
+
+    // Set boundary walls
+//    for (int i = 0; i < MAZE_SIZE; i++) {
+//        maze[i][0].walls[SOUTH] = true;                    // Bottom boundary
+//        maze[i][MAZE_SIZE-1].walls[NORTH] = true;          // Top boundary
+//        maze[0][i].walls[WEST] = true;                     // Left boundary
+//        maze[MAZE_SIZE-1][i].walls[EAST] = true;           // Right boundary
+//    }
+
+    // Set boundary walls (tri-state version)
+    for (int i = 0; i < MAZE_SIZE; i++) {
+        wall_state[i][0][SOUTH] = WALL_CLOSED;             // Bottom boundary
+        wall_state[i][MAZE_SIZE-1][NORTH] = WALL_CLOSED;   // Top boundary
+        wall_state[0][i][WEST] = WALL_CLOSED;              // Left boundary
+        wall_state[MAZE_SIZE-1][i][EAST] = WALL_CLOSED;    // Right boundary
+    }
+
+
 
     // Set maze center coordinates
     maze_center_x1 = MAZE_SIZE / 2 - 1;
@@ -127,6 +166,23 @@ void initialize_maze_exploration(void) {
     send_bluetooth_message("==========================================\r\n");
 }
 
+// Call this at the start of flood_fill_algorithm() in EXPLORE mode
+//static inline void seed_goal_center(void){
+//    int cx0 = (MAZE_SIZE/2)-1;
+//    int cy0 = (MAZE_SIZE/2)-1;
+//    int gxs[4] = { cx0, cx0+1, cx0,   cx0+1 };
+//    int gys[4] = { cy0, cy0,   cy0+1, cy0+1 };
+//
+//    queue_clear();
+//    for (int i=0;i<4;i++){
+//        int gx = gxs[i], gy = gys[i];
+//        maze[gx][gy].distance = 0;
+//        queue_push(gx, gy);
+//    }
+//}
+
+
+
 /**
  * @brief Flood fill algorithm implementation
  */
@@ -137,6 +193,8 @@ void flood_fill_algorithm(void) {
             maze[x][y].distance = MAX_DISTANCE;
         }
     }
+    //seed_goal_center();
+
 
     // Initialize queue
     queue_init(&bfs_queue);
@@ -167,8 +225,9 @@ void flood_fill_algorithm(void) {
         int y = current.y;
 
         // Check all four directions
-        for (int dir = 0; dir < 4; dir++) {
-            if (maze[x][y].walls[dir]) continue; // Wall blocks this direction
+        for (int dir = 0; dir < 4; dir++) {// UNKNOWN and CLOSED both block
+        	if (wall_state[x][y][dir] == WALL_CLOSED) continue;
+
 
             int nx = x + dx[dir];
             int ny = y + dy[dir];
@@ -209,7 +268,7 @@ int get_best_direction(void) {
         int dir = priority[p];
 
         // Check if there's a wall in this direction
-        if (maze[robot.x][robot.y].walls[dir]) continue;
+        if (wall_state[robot.x][robot.y][dir] == WALL_CLOSED) continue;
 
         int nx = robot.x + dx[dir];
         int ny = robot.y + dy[dir];
@@ -232,7 +291,7 @@ int get_best_direction(void) {
         for (int p = 0; p < 4; p++) {
             int dir = priority[p];
 
-            if (maze[robot.x][robot.y].walls[dir]) continue;
+            if (wall_state[robot.x][robot.y][dir] != WALL_OPEN) continue;
 
             int nx = robot.x + dx[dir];
             int ny = robot.y + dy[dir];
@@ -304,6 +363,9 @@ void turn_to_direction(int target_direction) {
 bool move_forward_one_cell(void) {
     send_bluetooth_printf("Moving forward from (%d,%d) to ", robot.x, robot.y);
 
+    int from_x = robot.x;
+    int from_y = robot.y;
+    int move_dir = robot.direction;
     // Calculate new position
     int new_x = robot.x + dx[robot.direction];
     int new_y = robot.y + dy[robot.direction];
@@ -324,6 +386,7 @@ bool move_forward_one_cell(void) {
     robot.x = new_x;
     robot.y = new_y;
     robot.exploration_steps++;
+    set_edge_state(from_x, from_y, move_dir, WALL_OPEN);
 
     // Mark cell as visited
     maze[robot.x][robot.y].visited = true;
@@ -335,6 +398,9 @@ int flag=1;
 
 bool move_forward_one_cell_truns(void){
     send_bluetooth_printf("Moving forward from (%d,%d) to ", robot.x, robot.y);
+    int from_x = robot.x;
+    int from_y = robot.y;
+    int move_dir = robot.direction;
 
     // Calculate new position
     int new_x = robot.x + dx[robot.direction];
@@ -383,6 +449,7 @@ bool move_forward_one_cell_truns(void){
     // Mark cell as visited
     maze[robot.x][robot.y].visited = true;
     maze[robot.x][robot.y].visit_count++;
+    set_edge_state(from_x, from_y, move_dir, WALL_OPEN);
 
     return true;
 }
@@ -405,42 +472,37 @@ bool is_at_goal(void) {
  * @brief Update walls based on sensor readings
  */
 void update_maze_walls(void) {
+
     // Update sensors first
     update_sensors();
 
-    // Update wall information based on current direction and sensor readings
+    // Directions relative to heading
+    int ld = (robot.direction + 3) % 4;
+    int rd = (robot.direction + 1) % 4;
+
+    // FRONT
     if (sensors.wall_front) {
-        maze[robot.x][robot.y].walls[robot.direction] = true;
-
-        // Update opposite wall in neighbor cell
-        int nx = robot.x + dx[robot.direction];
-        int ny = robot.y + dy[robot.direction];
-        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-            maze[nx][ny].walls[(robot.direction + 2) % 4] = true;
-        }
+        set_edge_state(robot.x, robot.y, robot.direction, WALL_CLOSED);
+    } else {
+        set_edge_state(robot.x, robot.y, robot.direction, WALL_OPEN);
     }
 
+    // LEFT
     if (sensors.wall_left) {
-        int left_dir = (robot.direction + 3) % 4;
-        maze[robot.x][robot.y].walls[left_dir] = true;
-
-        int nx = robot.x + dx[left_dir];
-        int ny = robot.y + dy[left_dir];
-        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-            maze[nx][ny].walls[(left_dir + 2) % 4] = true;
-        }
+        set_edge_state(robot.x, robot.y, ld, WALL_CLOSED);
+    } else {
+        set_edge_state(robot.x, robot.y, ld, WALL_OPEN);
     }
 
+    // RIGHT
     if (sensors.wall_right) {
-        int right_dir = (robot.direction + 1) % 4;
-        maze[robot.x][robot.y].walls[right_dir] = true;
-
-        int nx = robot.x + dx[right_dir];
-        int ny = robot.y + dy[right_dir];
-        if (nx >= 0 && nx < MAZE_SIZE && ny >= 0 && ny < MAZE_SIZE) {
-            maze[nx][ny].walls[(right_dir + 2) % 4] = true;
-        }
+        set_edge_state(robot.x, robot.y, rd, WALL_CLOSED);
+    } else {
+        set_edge_state(robot.x, robot.y, rd, WALL_OPEN);
     }
+
+    // (keep your existing send_bluetooth_printf(...) and beeps here)
+    // (keep visited bookkeeping)
 
     // Send wall detection feedback
     // Send wall detection feedback
@@ -457,7 +519,7 @@ void update_maze_walls(void) {
 
     // Mark current cell as visited
     maze[robot.x][robot.y].visited = true;
-    maze[robot.x][robot.y].visit_count++;
+    //maze[robot.x][robot.y].visit_count++;
 }
 
 /**
@@ -489,8 +551,9 @@ void explore_maze(void) {
 
             // Try alternative directions
             for (int alt_dir = 0; alt_dir < 4; alt_dir++) {
-                if (alt_dir != best_direction &&
-                    !maze[robot.x][robot.y].walls[alt_dir]) {
+            	// allow OPEN or UNKNOWN; forbid only CLOSED
+            	if (alt_dir != best_direction &&
+            	    wall_state[robot.x][robot.y][alt_dir] != WALL_CLOSED) {
 
                     turn_to_direction(alt_dir);
                     if (move_forward_one_cell()) {

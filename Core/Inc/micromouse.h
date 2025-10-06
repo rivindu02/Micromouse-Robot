@@ -150,7 +150,7 @@ void test_motors_individual(void);
 void motor_set(uint8_t motor, bool forward, uint16_t duty);
 void moveStraightPID(int base_pwm, bool left_forward, bool right_forward);
 void moveStraightPID_Reset(void);
-void moveStraightGyroPID(void);
+void moveStraightGyroPID(int pwm);
 void moveStraightGyroPID_Reset(void);
 void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms);
 

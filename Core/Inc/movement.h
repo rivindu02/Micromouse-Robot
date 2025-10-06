@@ -10,7 +10,7 @@ void stop_motors(void);
 void break_motors(void);
 void motor_set(uint8_t motor, bool forward, uint16_t duty);
 void moveStraightPID(int base_pwm, bool left_forward, bool right_forward);
-void moveStraightGyroPID(void);
+void moveStraightGyroPID(int pwm);
 void moveStraightGyroPID_Reset(void);
 float gyro_rate_pid_step(float sp_dps, float meas_dps, float *p_dt);
 void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms) ;

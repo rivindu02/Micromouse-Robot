@@ -193,7 +193,7 @@ void move_forward_distance(int Left_target_counts,int Right_target_counts) {
 
     while (1) {
     	mpu9250_read_gyro();
-    	moveStraightGyroPID();
+    	moveStraightGyroPID(570);
 
 
         int32_t current_left = get_left_encoder_total();
@@ -501,7 +501,7 @@ void moveStraightGyroPID_Reset(void) {
 
 
 
-void moveStraightGyroPID(void) {
+void moveStraightGyroPID(int pwm) {
     uint32_t now = HAL_GetTick();
     float dt = (now - pid_last_ms) / 1000.0f;
     if (dt <= 0.0f) dt = 0.001f; // safety small dt if HAL tick didn't advance
@@ -525,10 +525,10 @@ void moveStraightGyroPID(void) {
     float correction = (Kp_g * error) + (Ki_g * pid_integral) + (Kd_g * pid_deriv_filt);
 
     /* Base PWM for forward motion (adjust to your nominal cruising PWM) */
-    const int base_pwm = 570;
+    int pwm = 570;
 
-    int motor1Speed = (int)roundf((float)base_pwm - correction); // right wheel in your mapping
-    int motor2Speed = (int)roundf((float)base_pwm + correction); // left wheel
+    int motor1Speed = (int)roundf((float)pwm - correction); // right wheel in your mapping
+    int motor2Speed = (int)roundf((float)pwm + correction); // left wheel
 
     /* Clamp PWM outputs (and provide a safe top, not full 1000 if you prefer) */
     if (motor1Speed > 1200) motor1Speed = 1200;
@@ -546,7 +546,64 @@ void moveStraightGyroPID(void) {
     pid_error_prev = error;
 }
 
+// S curve code
+void move_with_profile(int distance_ticks){
+	reset_encoder_totals();
+	int32_t start_left  = get_left_encoder_total();
+	int32_t start_right = get_right_encoder_total();
 
+
+
+	for (int i = 500; i < 1000; i++) {
+		motor_set(0, true, i);  // Left motor
+		motor_set(1, true, i);  // Right motor
+		dwt_delay_us(1000);  // 5 ms per step (tune this)
+
+		int32_t current_left  = get_left_encoder_total();
+		int32_t current_right = get_right_encoder_total();
+		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
+
+		if ((-1)*avg_traveled >= 1380) {
+			//break_motors();
+			//HAL_Delay(5000);
+			break;
+
+		}
+	}
+
+	while(1){
+		int32_t current_left  = get_left_encoder_total();
+		int32_t current_right = get_right_encoder_total();
+		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
+
+		if ((-1)*avg_traveled >= distance_ticks - 1380) {
+			//break_motors();
+			break;
+			//HAL_Delay(5000);
+		}
+		motor_set(0, true, 1000);  // Left motor
+		motor_set(1, true, 1000);  // Right motor
+
+		dwt_delay_us(1000);
+	}
+	for (int i = 800; i > 400; i--) {
+		motor_set(0, true, i);  // Left motor
+		motor_set(1, true, i);  // Right motor
+
+		dwt_delay_us(1000);  // 5 ms per step (tune this)
+
+		int32_t current_left  = get_left_encoder_total();
+		int32_t current_right = get_right_encoder_total();
+		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
+
+		if (avg_traveled*(-1) >= distance_ticks) {
+			break_motors();
+			HAL_Delay(5000);
+
+			break;
+		}
+	}
+}
 
 
 
