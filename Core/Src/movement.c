@@ -98,15 +98,16 @@ extern bool align_front_to_wall(int base_pwm, uint32_t timeout_ms);
 #define S_CURVE_LUT_MIN_PWM 350
 extern void dwt_delay_us(uint32_t us);
 
-static const int16_t S_CURVE_LUT[S_CURVE_LUT_LEN] = {
-    700, 700, 700, 699, 698, 697, 695, 692, 689, 685, 680, 674, 667, 660, 652, 643, 633, 623, 612, 601, 589, 577, 564, 551, 538, 525, 512, 499, 486, 473, 461, 449, 438, 427, 417, 407, 398, 390, 383, 376, 370, 365, 361, 358, 355, 353, 352, 351, 350, 350, 350
-};
+//static const int16_t S_CURVE_LUT[S_CURVE_LUT_LEN] = {
+//    700, 700, 700, 699, 698, 697, 695, 692, 689, 685, 680, 674, 667, 660, 652, 643, 633, 623, 612, 601, 589, 577, 564, 551, 538, 525, 512, 499, 486, 473, 461, 449, 438, 427, 417, 407, 398, 390, 383, 376, 370, 365, 361, 358, 355, 353, 352, 351, 350, 350, 350
+//};
 
 void turn_left(void) {
 
     // turn 90 degrees left using gyro PID, 1200 ms timeout for safety
 	if (sensors.wall_front){
-		align_front_to_wall(600,4000);
+		align_front_to_wall(600,2000);
+		alignment(600,1000);
 	}else{
 
 		move_forward_distance(957,957);
@@ -125,7 +126,8 @@ void turn_left(void) {
 
 void turn_right(void) {
 	if (sensors.wall_front){
-		align_front_to_wall(600,3000);
+		align_front_to_wall(600,2000);
+		alignment(600,1000);
 	}else{
 		move_forward_distance(957,957);
 	}
@@ -140,7 +142,8 @@ void turn_right(void) {
  */
 void turn_around(void) {
 	if (sensors.wall_front){
-		align_front_to_wall(600,3000);
+		align_front_to_wall(600,2000);
+		alignment(600,1000);
 	}else{
 		move_forward_distance(957,957);
 	}
@@ -202,15 +205,15 @@ void move_forward_WF_distance_Profile(int Left_target_counts, int Right_target_c
 	int distance_ticks = (Left_target_counts + Right_target_counts) / 2;
 
 	// === ACCELERATION PHASE ===
-	for (int pwm = 500; pwm < 1000; pwm++) {
+	for (int pwm = 500; pwm < 900; pwm++) {
 		fusion_step(/*base_pwm=*/pwm);  // 0 → uses WF_BASE_PWM; or pass an explicit base
-		dwt_delay_us(1000);
+		dwt_delay_us(800);
 
 		int32_t current_left  = get_left_encoder_total();
 		int32_t current_right = get_right_encoder_total();
 		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
 
-		if ((-1) * avg_traveled >= 1380) {
+		if ((-1) * avg_traveled >= 1300) {
 			break;
 		}
 	}
@@ -221,14 +224,14 @@ void move_forward_WF_distance_Profile(int Left_target_counts, int Right_target_c
 		int32_t current_right = get_right_encoder_total();
 		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
 
-		if ((-1) * avg_traveled >= distance_ticks - 1380)  break;
+		if ((-1) * avg_traveled >= distance_ticks - 1460)  break;
 
-		fusion_step(/*base_pwm=*/1000);  // 0 → uses WF_BASE_PWM; or pass an explicit base
-		dwt_delay_us(1000);
+		fusion_step(/*base_pwm=*/900);  // 0 → uses WF_BASE_PWM; or pass an explicit base
+		dwt_delay_us(800);
 	}
 
 	// === DECELERATION PHASE ===
-	for (int pwm = 800; pwm > 200; pwm--) {
+	for (int pwm = 675; pwm > 200; pwm--) {
 		fusion_step(/*base_pwm=*/pwm);  // 0 → uses WF_BASE_PWM; or pass an expli
 		dwt_delay_us(900);
 
@@ -259,16 +262,16 @@ void move_forward_distance_Profile(int Left_target_counts, int Right_target_coun
 	int distance_ticks = (Left_target_counts + Right_target_counts) / 2;
 
 	// === ACCELERATION PHASE ===
-	for (int pwm = 500; pwm < 1000; pwm++) {
+	for (int pwm = 500; pwm < 900; pwm++) {
 		mpu9250_read_gyro();
 		moveStraightGyroPID(pwm);  // apply PWM through gyro correction
-		dwt_delay_us(1000);
+		dwt_delay_us(900);
 
 		int32_t current_left  = get_left_encoder_total();
 		int32_t current_right = get_right_encoder_total();
 		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
 
-		if ((-1) * avg_traveled >= 1380) {
+		if ((-1) * avg_traveled >= 1300) {
 			break;
 		}
 	}
@@ -279,17 +282,17 @@ void move_forward_distance_Profile(int Left_target_counts, int Right_target_coun
 		int32_t current_right = get_right_encoder_total();
 		int32_t avg_traveled = ((current_left - start_left) + (current_right - start_right)) / 2;
 
-		if ((-1) * avg_traveled >= distance_ticks - 1380) {
+		if ((-1) * avg_traveled >= distance_ticks - 1460) {
 			break;
 		}
 
 		mpu9250_read_gyro();
-		moveStraightGyroPID(1000);  // Maintain max speed
-		dwt_delay_us(1000);
+		moveStraightGyroPID(900);  // Maintain max speed
+		dwt_delay_us(900);
 	}
 
 	// === DECELERATION PHASE ===
-	for (int pwm = 800; pwm > 400; pwm--) {
+	for (int pwm = 800; pwm > 200; pwm--) {
 		mpu9250_read_gyro();
 		moveStraightGyroPID(pwm);
 		dwt_delay_us(1000);
@@ -595,16 +598,16 @@ static const float DERIV_FILTER_ALPHA = 0.936768f;    // computed from dt_med=0.
 static const float INTEGRAL_LIMIT = 5.0f; // tune as needed (units: deg/s * s)
 ////////////////////////////////////////
 // ---- Tuning knobs (start here) ----
-static const float ERR_DEADBAND   = 0.25f;   // deg/s; ignore tiny gyro bias
-static const float LEAK_RATE      = 0.002f;  // 1/s; integral will decay slowly
-static const float KAW            = 0.5f;    // anti-windup back-calc gain (0.2..1.0)
-static const float SLIP_THRESH    = 6.0f;    // deg/s; treat as transient/slip
-static const float COOLDOWN_TIME  = 0.8f;    // s; pause integration after slip
+//static const float ERR_DEADBAND   = 0.25f;   // deg/s; ignore tiny gyro bias
+//static const float LEAK_RATE      = 0.002f;  // 1/s; integral will decay slowly
+//static const float KAW            = 0.5f;    // anti-windup back-calc gain (0.2..1.0)
+//static const float SLIP_THRESH    = 6.0f;    // deg/s; treat as transient/slip
+//static const float COOLDOWN_TIME  = 0.8f;    // s; pause integration after slip
 
 static float learn_cooldown = 0.0f;          // pause timer for integrator
 
 // ---- Base PWM and limits ----
-static const int   base_pwm  = 600;   // your cruise PWM
+//static const int   base_pwm  = 600;   // your cruise PWM
 
 ////////////////////////////////////////
 /* Call this once immediately before starting a straight movement */

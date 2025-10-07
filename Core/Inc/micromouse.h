@@ -17,7 +17,7 @@
 #include <math.h>    // For fabsf(), sqrtf()
 
 /* Maze configuration */
-#define MAZE_SIZE 12
+#define MAZE_SIZE 16
 #define MAX_DISTANCE 9999
 #define CELL_SIZE_MM 180.0f
 
@@ -106,6 +106,9 @@ typedef struct {
     int32_t left_total;
     int32_t right_total;
 } EncoderData;
+
+
+
 /* Units: distance in mm, velocity in mm/s, acceleration in mm/s^2, jerk in mm/s^3 */
 
 
@@ -126,6 +129,8 @@ extern TIM_HandleTypeDef htim2;  // Left encoder
 extern TIM_HandleTypeDef htim3;   /* TIM3 – motor PWM */
 extern TIM_HandleTypeDef htim4;  // Right encoder
 extern UART_HandleTypeDef huart6;
+
+
 
 /* Direction vectors */
 extern const int dx[4];
@@ -260,7 +265,7 @@ float moving_average_filter(float new_value, float previous_average, int samples
 bool system_health_check(void);
 void performance_start_timer(void);
 void performance_end_timer(const char* operation_name);
-
+void print_optimal_distance_map(void);
 
 /*GPIO External Interrupt Callback*/
 void HAL_GPIO_EXTI_Callback(uint16_t GPIO_Pin);
@@ -304,7 +309,24 @@ void fusion_set_heading_ref_to_current(void);
 
 
 /* Function declarations */
+
+
+// ===== Tri-state wall map (shared) =====
+typedef enum {
+    WALL_UNKNOWN = -1,
+    WALL_OPEN    =  0,
+    WALL_CLOSED  =  1
+} WallState;
+
+
+
+void set_edge_state(int x, int y, int dir, WallState s);
 static void calculate_optimal_path_explored(void);
+void run_speed_to_center(void);
+WallState get_edge_state(int x, int y, int dir);   // << add this
+
+
+
 /**
  * @brief Initialize maze for exploration
  * Sets up the maze data structure, boundary walls, center coordinates,

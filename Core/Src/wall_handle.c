@@ -197,7 +197,7 @@ static inline int clampi_local(int v, int lo, int hi) {
     return (v < lo) ? lo : (v > hi) ? hi : v;
 }
 
-#define target_align 80
+#define target_align 70
 
 bool align_front_to_wall(int base_pwm, uint32_t timeout_ms)
 {

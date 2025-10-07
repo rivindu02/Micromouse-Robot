@@ -33,19 +33,27 @@ typedef struct {
 
 
 // ===== Tri-state wall map =====
-typedef enum { WALL_UNKNOWN = -1, WALL_OPEN = 0, WALL_CLOSED = 1 } WallState;
+//typedef enum { WALL_UNKNOWN = -1, WALL_OPEN = 0, WALL_CLOSED = 1 } WallState;
 static int8_t wall_state[MAZE_SIZE][MAZE_SIZE][4];
 
 // dx/dy must already exist; if not, you need the usual:
 ///* static const int dx[4] = {0, 1, 0, -1};   // N,E,S,W
 //   static const int dy[4] = {1, 0, -1, 0}; */
 
-static inline void set_edge_state(int x, int y, int dir, WallState s){
+void set_edge_state(int x, int y, int dir, WallState s){
     wall_state[x][y][dir] = s;
     int nx = x + dx[dir], ny = y + dy[dir];
     if (nx>=0 && nx<MAZE_SIZE && ny>=0 && ny<MAZE_SIZE)
         wall_state[nx][ny][(dir+2)%4] = s;
 }
+
+WallState get_edge_state(int x, int y, int dir)
+{
+    if ((unsigned)x >= MAZE_SIZE || (unsigned)y >= MAZE_SIZE || (unsigned)dir >= 4)
+        return WALL_CLOSED; // safest default
+    return (WallState)wall_state[x][y][dir];
+}
+
 
 typedef struct {
     Position queue[QUEUE_MAX_SIZE];
@@ -187,21 +195,17 @@ void initialize_maze_exploration(void) {
  * @brief Flood fill algorithm implementation
  */
 void flood_fill_algorithm(void) {
-    // Initialize all distances to MAX_DISTANCE
+    // Initialize all distances
     for (int x = 0; x < MAZE_SIZE; x++) {
         for (int y = 0; y < MAZE_SIZE; y++) {
             maze[x][y].distance = MAX_DISTANCE;
         }
     }
-    //seed_goal_center();
 
-
-    // Initialize queue
     queue_init(&bfs_queue);
 
-    // Set goal distances and add to queue
+    // Set goal distances
     if (!robot.center_reached) {
-        // Heading to center
         maze[maze_center_x1][maze_center_y1].distance = 0;
         maze[maze_center_x2][maze_center_y1].distance = 0;
         maze[maze_center_x1][maze_center_y2].distance = 0;
@@ -212,27 +216,23 @@ void flood_fill_algorithm(void) {
         queue_push(&bfs_queue, (Position){maze_center_x1, maze_center_y2});
         queue_push(&bfs_queue, (Position){maze_center_x2, maze_center_y2});
     } else {
-        // Returning to start
         maze[0][0].distance = 0;
         queue_push(&bfs_queue, (Position){0, 0});
     }
 
-    // Flood fill propagation
     int updates = 0;
     while (!queue_empty(&bfs_queue)) {
         Position current = queue_pop(&bfs_queue);
         int x = current.x;
         int y = current.y;
 
-        // Check all four directions
-        for (int dir = 0; dir < 4; dir++) {// UNKNOWN and CLOSED both block
-        	if (wall_state[x][y][dir] == WALL_CLOSED) continue;
-
+        for (int dir = 0; dir < 4; dir++) {
+            // FIX: Use wall_state instead of maze[].walls
+            if (wall_state[x][y][dir] == WALL_CLOSED) continue;
 
             int nx = x + dx[dir];
             int ny = y + dy[dir];
 
-            // Check bounds
             if (nx < 0 || nx >= MAZE_SIZE || ny < 0 || ny >= MAZE_SIZE) continue;
 
             int new_distance = maze[x][y].distance + 1;
@@ -334,24 +334,24 @@ void turn_to_direction(int target_direction) {
             // Turn right (90 degrees clockwise)
             send_bluetooth_message("Turning RIGHT...\r\n");
             turn_right();
-            l=1549;
-            r=1537;
+            l=1482;
+            r=1482;
             play_turn_beep();
             break;
         case 2:
             // Turn around (180 degrees)
             send_bluetooth_message("Turning AROUND...\r\n");
             turn_around();
-            l=1530;
-            r=1562;
+            l=1452;
+            r=1452;
             play_turn_beep();
             break;
         case 3:
             // Turn left (90 degrees counter-clockwise)
             send_bluetooth_message("Turning LEFT...\r\n");
             turn_left();
-            l=1330;
-            r=1352;
+            l=1390;
+            r=1390;
             play_turn_beep();
             break;
     }
@@ -586,6 +586,13 @@ void explore_maze(void) {
             send_bluetooth_message("🎯 CENTER REACHED! 🎯\r\n");
             play_success_tone();
 
+            // ADD THIS - Reset visit counts for return journey
+            for (int x = 0; x < MAZE_SIZE; x++) {
+                for (int y = 0; y < MAZE_SIZE; y++) {
+                    maze[x][y].visit_count = 0;
+                }
+            }
+
             // Brief celebration
             led_sequence_complete();
             HAL_Delay(2000);
@@ -632,27 +639,31 @@ void run_maze_exploration_sequence(void) {
 
     // Phase 3: Report results
     if (robot.returned_to_start) {
-        send_bluetooth_message("\r\n" "🏆 EXPLORATION COMPLETE! 🏆" "\r\n");
-        send_performance_metrics();
+    	send_bluetooth_message("\r\n🏆 EXPLORATION COMPLETE! 🏆\r\n");
+		send_performance_metrics();
 
-        // Calculate exploration efficiency
-        int total_cells = MAZE_SIZE * MAZE_SIZE;
-        int visited_cells = 0;
-        for (int x = 0; x < MAZE_SIZE; x++) {
-            for (int y = 0; y < MAZE_SIZE; y++) {
-                if (maze[x][y].visited) visited_cells++;
-            }
-        }
+		// Calculate exploration efficiency
+		int total_cells = MAZE_SIZE * MAZE_SIZE;
+		int visited_cells = 0;
+		for (int x = 0; x < MAZE_SIZE; x++) {
+			for (int y = 0; y < MAZE_SIZE; y++) {
+				if (maze[x][y].visited) visited_cells++;
+			}
+		}
 
-        float exploration_percentage = (float)visited_cells / total_cells * 100.0f;
-        send_bluetooth_printf("Exploration Coverage: %d/%d cells (%.1f%%)\r\n",
-                             visited_cells, total_cells, exploration_percentage);
+		float exploration_percentage = (float)visited_cells / total_cells * 100.0f;
+		send_bluetooth_printf("Exploration Coverage: %d/%d cells (%.1f%%)\r\n",
+							 visited_cells, total_cells, exploration_percentage);
 
-        // Ready for speed run (future implementation)
-        send_bluetooth_message("🚀 Ready for speed run optimization! 🚀\r\n");
+		// ADD THESE LINES:
+		send_bluetooth_message("\r\n[INFO] Calculating optimal path through explored areas...\r\n");
+		calculate_optimal_path_explored();
+		print_optimal_distance_map();
 
-        exploration_completed = 1;
-    }
+		// Ready for speed run
+		send_bluetooth_message("🚀 Ready for speed run optimization! 🚀\r\n");
+		exploration_completed = 1;
+	}
 }
 
 /**
@@ -687,7 +698,30 @@ int get_optimal_distance(void) {
     return maze[0][0].distance;
 }
 
+void print_optimal_distance_map(void) {
+    send_bluetooth_message("\r\n[MAP] OPTIMAL DISTANCES (explored only)\r\n    ");
 
+    // Header
+    for (int x = 0; x < MAZE_SIZE; x++) {
+        send_bluetooth_printf("%3d", x);
+    }
+    send_bluetooth_message("\r\n");
+
+    // Rows (top to bottom in typical maze view)
+    for (int y = MAZE_SIZE-1; y >= 0; y--) {
+        send_bluetooth_printf("%3d", y);
+        for (int x = 0; x < MAZE_SIZE; x++) {
+            if (!maze[x][y].visited) {
+                send_bluetooth_message("  -");
+            } else if (maze[x][y].distance == MAX_DISTANCE) {
+                send_bluetooth_message("  ∞");
+            } else {
+                send_bluetooth_printf("%3d", maze[x][y].distance);
+            }
+        }
+        send_bluetooth_message("\r\n");
+    }
+}
 
 static int optimal_steps_explored = -1;
 

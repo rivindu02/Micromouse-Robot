@@ -1,0 +1,9 @@
+../Core/Src/speed_run.c:26:19:is_open_edge	24	static
+../Core/Src/speed_run.c:33:12:count_forward_cells_along_gradient	48	static
+../Core/Src/speed_run.c:58:13:execute_forward_cells_auto	40	static
+../Core/Src/speed_run.c:87:13:execute_segment	16	static
+../Core/Src/speed_run.c:111:6:run_speed_to_center	40	static
+../Core/Src/speed_run.c:153:6:turn_right_45	8	static
+../Core/Src/speed_run.c:161:6:turn_left_45	8	static
+../Core/Src/speed_run.c:169:6:right_diagonal	16	static
+../Core/Src/speed_run.c:192:6:left_diagonal	16	static

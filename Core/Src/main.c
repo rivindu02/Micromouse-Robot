@@ -444,6 +444,9 @@ int main(void)
 		} else if (is_exploration_complete()) {
 			send_bluetooth_message("\r\n🏁 EXPLORATION COMPLETE - Ready for speed run! 🏁\r\n");
 			send_performance_metrics();
+			print_optimal_distance_map();
+			send_bluetooth_message("== SPEED RUN START ==\r\n");
+			run_speed_to_center();
 			//calculate_optimal_path_explored();
 
 		} else if (!system_ready) {

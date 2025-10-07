@@ -14,7 +14,6 @@ void moveStraightGyroPID(int pwm);
 void moveStraightGyroPID_Reset(void);
 float gyro_rate_pid_step(float sp_dps, float meas_dps, float *p_dt);
 void turn_in_place_gyro(float angle_deg, int base_pwm, uint32_t timeout_ms) ;
-void move_forward_distance_Profile(int Left_target_counts,int Right_target_counts);
 // Enhanced encoder functions
 int32_t get_left_encoder_total(void);
 int32_t get_right_encoder_total(void);
@@ -25,6 +24,9 @@ void test_encoder_manual(void);
 void test_encoder_rotation(void);
 void gyro_turn_reset(void);
 
+// profile movers (straight)
+void move_forward_distance_Profile(int left_counts, int right_counts);       // gyro PID (non-wall-follow)
+void move_forward_WF_distance_Profile(int left_counts, int right_counts);    // wall-follow version
 
 
 #endif
