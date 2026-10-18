@@ -2,7 +2,7 @@
 """
 render_gif.py - animate a simulator trace as a GIF
 
-    ./build/sim --random 1 24 --trace trace.txt
+    ./build/sim mazes/two-routes.txt --trace trace.txt
     python3 render_gif.py trace.txt ../../docs/exploration.gif
 
 Shows the three phases of a run:
@@ -148,6 +148,7 @@ class Scene:
         self.robot = (0, 0, 0)
         self.phase = 0
         self.plan = None
+        self.final = False
         for (x, y) in walls:
             if x == 0: self.seen[(x, y, 3)] = True
             if x == N - 1: self.seen[(x, y, 1)] = True
@@ -194,10 +195,10 @@ class Scene:
         for ph in (0, 1):
             pts = self.trails[ph]
             if len(pts) > 1:
-                colour = TRAIL_DIM[ph] if speed else TRAIL[ph]
+                colour = TRAIL_DIM[ph] if (speed and not self.final) else TRAIL[ph]
                 g.line([centre_px(*p) for p in pts], fill=colour, width=2, joint="curve")
-        if self.plan:
-            g.line([centre_px(*p) for p in self.plan], fill=TRAIL_DIM[0], width=1)
+        if self.plan and self.final:
+            g.line([centre_px(*p) for p in self.plan], fill=TRAIL[2], width=2)
         if len(self.trails[2]) > 1:
             g.line([centre_px(*p) for p in self.trails[2]], fill=TRAIL[2], width=5, joint="curve")
 
@@ -246,12 +247,14 @@ def main():
     sc = Scene(walls)
     frames, durations = [], []
     cells = [0, 0, 0]
+    first_route = None
+    name = name[:-4] if name.endswith(".txt") else name
     last_dir = 0
     turns = 0
 
     def stats():
         s = f"Maze {name}  |  explored {cells[0] + cells[1]} cells, {turns} turns"
-        if sc.phase == 2:
+        if cells[2]:
             s += f"  |  speed run {cells[2]} cells"
         return s
 
@@ -271,7 +274,12 @@ def main():
                     sc.phase = 2
                     sc.candidates = set()
                     sc.plan = known_shortest(sc.seen, sc.visited)
-                    add(f"Shortest path proven: {len(sc.plan) - 1} cells", 1500)
+                    label = f"Shortest path proven: {len(sc.plan) - 1} cells"
+                    if first_route and first_route > len(sc.plan) - 1:
+                        label += f" (first route: {first_route})"
+                    sc.final = True         # show both routes and the plan in full colour
+                    add(label, 2200)
+                    sc.final = False
                 sc.phase = ph
                 sc.trails[ph] = [(x, y)]
             if ph < 2 and d != last_dir:
@@ -290,11 +298,18 @@ def main():
             add(LABELS[ph], 40 if ph == 2 else 65)
             if (nx, ny) in CENTRE and ph == 0:
                 durations[-1] = 900
+                if first_route is None:
+                    path = known_shortest(sc.seen, sc.visited)
+                    first_route = len(path) - 1 if path else None
             if (nx, ny) == (0, 0) and ph == 1:
                 durations[-1] = 900
         elif ev[0] == "END":
             sc.robot = (ev[1], ev[2], ev[3])
-            add(f"Speed run done: {cells[2]} cells, start to centre", 3500)
+            sc.final = True
+            label = f"Speed run: {cells[2]} cells"
+            if first_route and first_route > cells[2]:
+                label += f", first route was {first_route}"
+            add(label, 4000)
 
     # one palette built from a sample of all frames keeps colours stable
     sample = frames[::max(1, len(frames) // 12)] + [frames[-1]]
