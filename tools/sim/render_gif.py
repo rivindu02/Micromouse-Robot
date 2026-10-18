@@ -2,7 +2,7 @@
 """
 render_gif.py - animate a simulator trace as a GIF
 
-    ./build/sim mazes/two-routes.txt --trace trace.txt
+    ./build/sim mazes/complex.txt --trace trace.txt
     python3 render_gif.py trace.txt ../../docs/exploration.gif
 
 Shows the three phases of a run:
