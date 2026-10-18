@@ -431,6 +431,15 @@ float get_exploration_efficiency(void);
  */
 int get_optimal_distance(void);
 
+/**
+ * @brief Drive the shortest known path from start to the centre
+ * Call after run_maze_exploration_sequence(). Plans over visited cells
+ * only and uses the exploration turn/move functions.
+ *
+ * @return true when the centre was reached
+ */
+bool run_speed_run(void);
+
 
 
 
