@@ -252,4 +252,4 @@ save the serial output as CSV and pass it to the script. The scripts need
 
 ## Contributors
 
-rivindu02, Praveen-samuditha.
+rivindu02, Praveen-samuditha, Mohammed Aashir.
