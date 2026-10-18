@@ -14,6 +14,8 @@ measured before they go on the robot.
 
 - `update_sensors()` reads the walls around the virtual robot from the maze.
 - `move_forward_*()` and `turn_*()` move the virtual robot one cell or 90/180°.
+- After exploration it calls `run_speed_run()` and checks it drives a true
+  shortest path.
 - `HAL_Delay()` and `HAL_UART_Transmit()` add to a simulated clock instead of
   waiting. UART time uses the firmware baud rate (9600, 10 bits per byte).
 
@@ -34,7 +36,7 @@ make CORE=/path/to/other/Core       # build against another firmware version
 ## Animation
 
 ```sh
-make gif    # sim --trace on generated maze 7, then render_gif.py -> docs/exploration.gif
+make gif    # sim --trace on generated maze 27, then render_gif.py -> docs/exploration.gif
 ```
 
 `--trace out.txt` logs the true maze, every sensor read (`S x y dir`) and every
@@ -56,6 +58,7 @@ not copied into this repo.
 | `uart_s` | time blocked sending Bluetooth text at 9600 baud |
 | `known` | shortest start-to-centre path using only walls the robot saw |
 | `best` | true shortest path in the maze |
+| `speed` | cells driven by `run_speed_run()` (must equal `best`) |
 
 The simulator does not model motion time, wheel slip or sensor noise. Use it
 to compare decision logic and idle time, not to predict lap times.
