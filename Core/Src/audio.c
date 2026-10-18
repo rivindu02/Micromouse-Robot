@@ -96,19 +96,23 @@ void play_error_tone(void)
 }
 
 /**
- * @brief Play wall detection beep
+ * @brief Play wall detection beep (only when AUDIO_FEEDBACK is enabled)
  */
 void play_wall_beep(void)
 {
+#if AUDIO_FEEDBACK
     play_tone(1000, 50);
+#endif
 }
 
 /**
- * @brief Play turn signal beep
+ * @brief Play turn signal beep (only when AUDIO_FEEDBACK is enabled)
  */
 void play_turn_beep(void)
 {
+#if AUDIO_FEEDBACK
     play_tone(800, 30);
+#endif
 }
 
 /**

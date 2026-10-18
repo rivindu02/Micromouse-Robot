@@ -46,6 +46,40 @@
 #define PWM_MIN_MOVE_RIGHT  450
 
 
+/*
+ * Bluetooth telemetry level during exploration (USART6 runs at 9600 baud
+ * and HAL_UART_Transmit blocks, so every byte costs about 1 ms):
+ *   0 = no exploration messages
+ *   1 = milestones and errors only (default)
+ *   2 = verbose: every move, turn, wall reading, flood fill and a full
+ *       maze dump every 5 steps (the old behaviour, ~0.4 s idle per cell)
+ * Override with -DTELEMETRY_LEVEL=2 in the build settings.
+ */
+#ifndef TELEMETRY_LEVEL
+#define TELEMETRY_LEVEL 1
+#endif
+
+#if TELEMETRY_LEVEL >= 1
+#define TLM_INFO(...) send_bluetooth_printf(__VA_ARGS__)
+#else
+#define TLM_INFO(...) ((void)0)
+#endif
+
+#if TELEMETRY_LEVEL >= 2
+#define TLM_VERBOSE(...) send_bluetooth_printf(__VA_ARGS__)
+#else
+#define TLM_VERBOSE(...) ((void)0)
+#endif
+
+/*
+ * Per-cell wall beep (50 ms) and per-turn beep (30 ms). They block while
+ * playing, so they are off by default. Startup, success and error tones
+ * always play. Override with -DAUDIO_FEEDBACK=1.
+ */
+#ifndef AUDIO_FEEDBACK
+#define AUDIO_FEEDBACK 0
+#endif
+
 /* Audio frequencies (Hz) */
 #define TONE_STARTUP 440
 #define TONE_CONFIRMATION 523
