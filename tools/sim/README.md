@@ -36,17 +36,24 @@ make CORE=/path/to/other/Core       # build against another firmware version
 ## Animation
 
 ```sh
-make gif    # sim --trace on mazes/two-routes.txt, then render_gif.py -> docs/exploration.gif
+make gif    # builds mazes/complex.txt, sim --trace, render_gif.py -> docs/exploration.gif
 ```
 
 `--trace out.txt` logs the true maze, every sensor read (`S x y dir`) and every
 move with the firmware's flood fill distances (`M x y dir phase d0..d255`).
 `render_gif.py` turns that log into a GIF (needs Pillow).
 
-`mazes/two-routes.txt` is a hand-designed demo maze made by
-`make_demo_maze.py`. It has two routes to the centre: the robot explores one
-on the way out, comes back along the other, and the speed run combines
-them. Every other cell belongs to closed-off mini mazes. Any maze file or
+Demo mazes come from `make_demo_maze.py`:
+
+- `mazes/complex.txt` (`complex 248 20`, used for the GIF): backtracker maze
+  with long corridors and dead ends, a centre room with two entrances, and
+  20 extra openings for loops.
+- `mazes/two-routes.txt` (`two-routes`): two carved routes, a simple case
+  where the robot goes out on one and comes back on the other.
+
+`find_demo_maze.py [seeds] [loops ...]` searches complex mazes for a good
+story: the return trip mostly on new cells, the speed run using cells from
+both trips, and a speed run shorter than the first route. Any maze file or
 `--random N seed` also works with `--trace`.
 
 Classic competition mazes in the expected text format are available at

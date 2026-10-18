@@ -23,15 +23,17 @@ shortest path is proven, then runs that path start to centre.
 <p align="center"><img src="docs/exploration.gif" alt="Simulated run: explore to the centre, check other routes on the way back, then speed run"></p>
 
 The firmware's maze logic running in the host simulator (`tools/sim`,
-`make gif`) on a demo maze with two routes to the centre:
+`make gif`) on a full 16×16 maze with long corridors, dead ends and loops
+(`tools/sim/mazes/complex.txt`):
 
-1. **Out (cyan):** the robot finds route A, up the west side and along the
-   top, 27 cells.
-2. **Back (amber):** A is the only known path, so cells that could hold a
-   shorter route (orange boxes) are still unchecked. The robot returns along
-   a new route B, across the bottom and up the right side.
-3. **Speed run (green):** the shortest path through everything it has seen
-   is B's first part plus A's last few cells, 25 cells.
+1. **Out (cyan):** the robot follows the flood fill, hits dead ends and
+   reaches the centre on a winding first route of 72 cells.
+2. **Back (amber):** that route is far longer than the best route that
+   might exist through unseen cells (orange boxes). The robot checks those
+   cells on the way back, through the middle of the maze, mostly on cells it
+   has not driven before.
+3. **Speed run (green):** the shortest path over everything it has seen
+   combines parts of both trips: 26 cells instead of 72.
 
 Red: walls the robot has sensed. Blue shading: flood fill distance to the
 current goal.
