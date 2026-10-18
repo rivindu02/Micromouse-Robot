@@ -58,7 +58,6 @@
 #define GYRO_CS_GPIO_Port Chip_Select_GPIO_Port
 
 
-bool are_sensors_healthy(void);
 /* Data structures */
 typedef struct {
     int distance;
@@ -143,6 +142,7 @@ void turn_around(void);
 void stop_motors(void);
 void break_motors(void);
 void move_forward_distance(int Left_target_counts,int Right_target_counts);
+void move_forward_WF_distance(int Left_target_counts,int Right_target_counts);
 void test_motors_individual(void);
 void motor_set(uint8_t motor, bool forward, uint16_t duty);
 void moveStraightPID(int base_pwm, bool left_forward, bool right_forward);

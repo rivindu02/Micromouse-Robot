@@ -693,14 +693,20 @@ static uint8_t WF_FRONT_HOLD_MS = 120;     // brief brake pulse before stop (if 
 
 // ---------- Lookup Tables ----------
 // Right sensor LUT
-#define R_LUT_SIZE 33
-static const int   right_adc[R_LUT_SIZE]   = {43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11};
-static const float right_dist[R_LUT_SIZE]  = {1.17,1.23,1.29,1.36,1.43,1.51,1.59,1.67,1.76,1.85,1.95,2.05,2.16,2.28,2.40,2.53,2.67,2.82,2.98,3.16,3.34,3.55,3.76,4.00,4.26,4.54,4.85,5.19,5.57,5.98,6.45,6.96};
+// (ADC 11 had no distance value, so the last entry read as 0.0 cm; removed)
+static const int   right_adc[]   = {43,42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12};
+static const float right_dist[]  = {1.17,1.23,1.29,1.36,1.43,1.51,1.59,1.67,1.76,1.85,1.95,2.05,2.16,2.28,2.40,2.53,2.67,2.82,2.98,3.16,3.34,3.55,3.76,4.00,4.26,4.54,4.85,5.19,5.57,5.98,6.45,6.96};
 
 // Left sensor LUT
-#define L_LUT_SIZE 32
-static const int   left_adc[L_LUT_SIZE]    = {42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11};
-static const float left_dist[L_LUT_SIZE]   = {1.17,1.23,1.29,1.36,1.43,1.51,1.59,1.67,1.76,1.85,1.95,2.05,2.16,2.28,2.40f,2.53f,2.67f,2.82f,2.98f,3.16f,3.34f,3.55f,3.76f,4.00f,4.26f,4.54f,4.85f,5.19f,5.57f,5.98f,6.45f,6.96f};
+static const int   left_adc[]    = {42,41,40,39,38,37,36,35,34,33,32,31,30,29,28,27,26,25,24,23,22,21,20,19,18,17,16,15,14,13,12,11};
+static const float left_dist[]   = {1.17,1.23,1.29,1.36,1.43,1.51,1.59,1.67,1.76,1.85,1.95,2.05,2.16,2.28,2.40f,2.53f,2.67f,2.82f,2.98f,3.16f,3.34f,3.55f,3.76f,4.00f,4.26f,4.54f,4.85f,5.19f,5.57f,5.98f,6.45f,6.96f};
+
+#define R_LUT_SIZE ((int)(sizeof(right_adc) / sizeof(right_adc[0])))
+#define L_LUT_SIZE ((int)(sizeof(left_adc) / sizeof(left_adc[0])))
+_Static_assert(sizeof(right_adc) / sizeof(right_adc[0]) == sizeof(right_dist) / sizeof(right_dist[0]),
+               "right sensor LUT: ADC and distance tables must have the same length");
+_Static_assert(sizeof(left_adc) / sizeof(left_adc[0]) == sizeof(left_dist) / sizeof(left_dist[0]),
+               "left sensor LUT: ADC and distance tables must have the same length");
 
 //// ---------- Lookup Tables ----------
 //// Right sensor LUT
