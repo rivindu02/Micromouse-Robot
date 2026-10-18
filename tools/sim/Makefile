@@ -18,7 +18,7 @@ run: build/sim
 	./build/sim -v --random 200 1
 
 gif: build/sim
-	./build/sim --random 1 7 --trace build/trace.txt
+	./build/sim --random 1 27 --trace build/trace.txt
 	python3 render_gif.py build/trace.txt ../../docs/exploration.gif
 
 clean:
