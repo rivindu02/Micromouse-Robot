@@ -1,223 +1,141 @@
+# Micromouse – Function Reference & Debug Guide
 
+What each source file does, the functions that matter, and a debug workflow.
+For hardware, build steps and tuning values see [README.md](README.md).
 
-# Championship Micromouse – Function Reference \& Debug Guide
+Conventions used by the code:
 
-*Last Updated: August 29, 2025*
+- Maze coordinates: `(0,0)` is the start cell (bottom-left), `x` grows east,
+  `y` grows north. `maze[x][y]`.
+- Directions: `NORTH 0`, `EAST 1`, `SOUTH 2`, `WEST 3`; `dx[]`, `dy[]` in
+  `main.c`. Right turn = `+1`, left turn = `+3` (mod 4).
+- Encoder totals count **down** when driving forward, so distance travelled
+  is `start - current`.
+- Motor index `0` = left, `1` = right. PWM duty range used by code 0…1000
+  (TIM3 period is 838, so anything above 838 is full duty).
 
-This document explains the purpose of each module and key functions, and provides a step-by-step debugging workflow.
+## main.c
 
-## 📁 Module \& Function Overview
+| Function | Notes |
+|---|---|
+| `main()` | HAL + clock (84 MHz) + peripheral init, `dwt_delay_init()`, `initialize_hardware_systems()`, `run_system_diagnostics()`, start-up tone and LEDs, then the button loop. |
+| `initialize_hardware_systems()` | Starts TIM3 PWM channels, enables DRV8833 (STBY), checks ADC pins, inits MPU9250 and calibrates gyro bias (robot must be still), starts encoders, `initialize_maze_exploration()`. |
+| `run_system_diagnostics()` | One sensor read, battery, gyro and encoder status, `system_health_check()`. Sets `system_ready = true` even when the check warns. |
+| `send_periodic_status()` | Battery report every 10 s while idle, LED heartbeat every 2 s. |
+| `HAL_GPIO_EXTI_Callback()` | 200 ms debounce. Left button → `button_pressed = 1`, right → `2`. |
+| Main loop | Left: start exploration (blocking) or print metrics after a run. Right: status report, or emergency stop if a run is marked active. |
 
-### 1. main.c
+`USER CODE BEGIN 2` lists the bench tests you can call instead of running
+the maze.
 
-- **`main()`**
-- Initializes HAL and system clock
-- Calls `championship_micromouse_init()` to set up data structures
-- Tests LEDs, speaker, Bluetooth
-- Waits for **start** button, then runs exploration
-- In infinite loop, debounces buttons to trigger new exploration or speed run
-- **`SystemClock_Config()`**, **`MX_<Peripheral>_Init()`**
-- Auto-generated HAL code to configure clocks, GPIO, ADC, SPI, TIM, UART
+## micromouse.c – maze logic
 
+| Function | Notes |
+|---|---|
+| `initialize_maze_exploration()` | Clears the maze, sets boundary walls, centre = cells (7,7)…(8,8), robot at (0,0) facing north. |
+| `flood_fill_algorithm()` | BFS from the goal over known walls (unknown = open). Goal is the four centre cells until `center_reached`, then the start cell. |
+| `get_best_direction()` | Open neighbour with the lowest distance; ties → least visited, then forward, right, left, back. Never returns a walled direction if any side is open. |
+| `turn_to_direction(dir)` | Calls `turn_right()`, `turn_left()` or `turn_around()` and loads the tuned first-cell counts for the next move. |
+| `move_forward_one_cell_truns()` | Drives one cell: post-turn counts if a turn just happened; else wall-follow (`move_forward_WF_distance`) when a side wall is seen, else gyro straight (`move_forward_distance`). First move from start uses 1200 counts. Updates position and `visit_count`. |
+| `move_forward_one_cell()` | Plain full-cell gyro move; used only as fallback. |
+| `update_maze_walls()` | `update_sensors()`, then writes front/left/right walls into the current and neighbouring cell. |
+| `explore_maze()` | One phase: sense → flood fill → choose → turn → move, until goal or `MAZE_SIZE² × 3` moves. Sets `center_reached` / `returned_to_start`. |
+| `run_maze_exploration_sequence()` | Phase 1 to centre, 1 s pause, phase 2 back to start, then coverage report. |
+| `get_exploration_efficiency()`, `get_optimal_distance()` | Report values for `send_performance_metrics()`. |
+| `dwt_delay_init()`, `dwt_delay_us()` | Busy-wait microsecond delay on the DWT cycle counter. |
 
-### 2. micromouse.c
+## movement.c – motors, encoders, gyro motion
 
-- **`championship_micromouse_init()`**
-- Clears maze array, sets boundary walls, resets visit counts
-- Initializes MPU9250, resets robot state
-- **`championship_update_walls()`**
-- Reads IR sensors via `update_sensors()`
-- Updates `maze[x][y].walls[N/E/S/W]` based on sensor booleans
-- Increments visit_count and marks `visited = true`
-- **`championship_flood_fill()`**
-- Breadth-first fill: from center until start reached, then reverse
-- Sets `maze[x][y].distance` = minimum steps to goal
-- **`get_championship_direction()`**
-- Examines four directions in priority order (straight, right, left, back)
-- Prefers unvisited cells with lowest distance, then least-visited
-- **`championship_exploration_with_analysis()`**
-- Loop: update walls, flood fill, choose direction, turn, move forward
-- On center reached, switches to return mode, resets visit counts
-- After return, calls `execute_championship_path_analysis()`
-- **`championship_speed_run()`**
-- Executes high-speed optimal path run using explored maze data
-- Uses same flood fill + direction selection for maximum speed
+| Function | Notes |
+|---|---|
+| `start_encoders()`, `update_encoder_totals()`, `get_left/right_encoder_total()`, `reset_encoder_totals()` | 16-bit timer counters unwrapped into 32-bit totals. Right side is negated so both wheels share a sign. |
+| `motor_set(motor, forward, duty)` | DRV8833 drive. Some branches use a GPIO write on a PWM pin (no effect) — intentional, see README *Hardware workarounds*. |
+| `stop_motors()` | All four PWM compares to 0 (coast). |
+| `break_motors()` | All inputs high for 20 ms (brake), then `stop_motors()`. |
+| `moveStraightGyroPID_Reset()`, `moveStraightGyroPID()` | PID on gyro Z rate to hold heading, base 570. Call `mpu9250_read_gyro()` before each step. |
+| `move_forward_distance(L, R)` | Gyro straight until either wheel reaches its count, then brake. |
+| `move_forward_WF_distance(L, R)` | Same, with `wall_follow_step()` (base 600). |
+| `turn_in_place_gyro(angle, base_pwm, timeout)` | +angle = left (CCW). Yaw integration, braking-law rate target, rate PID + feed-forward. `base_pwm` clamped to 60…400. Ends with `break_motors()` + 60 ms. |
+| `turn_left()`, `turn_right()`, `turn_around()` | Front-wall align if a wall is ahead, else 957-count move; then ±90° (two −90° for around). |
+| `moveStraightPID*()` | Encoder-rate PID, not used by exploration. |
+| `test_motors_individual()`, `debug_encoder_setup()`, `test_encoder_manual()`, `test_encoder_rotation()`, `send_encoder_status()` | Bench helpers. |
 
+## wall_handle.c – wall controllers
 
-### 3. championship_analysis.c
+| Function | Notes |
+|---|---|
+| `align_front_to_wall(base_pwm, timeout)` | PI on front sensors: distance (mean − 80) and angle (FL − FR). Min drive 500 to beat dead zone; done after 150 ms within tolerance. |
+| `wall_follow_reset_int(mode, base_pwm)`, `wall_follow_step()` | Side sensors → cm via `right_adc/right_dist` and `left_adc/left_dist` tables, PID to 2.5 cm from the visible wall (left preferred when both). |
+| `fusion_reset()`, `fusion_set_heading_ref_to_current()`, `fusion_step(base)` | Wall PID blended with gyro heading hold. Not used in exploration. |
 
-- **`calculate_optimal_path_from_explored_areas()`**
-- Flood fill using **only visited cells** to compute optimal distances
-- Records `theoretical_minimum` steps from start to center
-- **`analyze_championship_maze_performance()`**
-- Counts visited cells vs total for **exploration efficiency**
-- Compares `theoretical_minimum` vs `MAX_DISTANCE` to rate performance
-- Sends Bluetooth ratings: ⭐ to ⭐⭐⭐⭐⭐
-- **`print_championship_distance_map()`**
-- Outputs a grid of distances (`-` = unvisited, `∞` = unreachable)
-- **`visualize_championship_optimal_path()`**
-- Traces and logs the optimal path step by step via Bluetooth
-- **`show_championship_distances()`**
-- Summarizes distribution of distance values for debugging
+## sensors.c – IR and ADC
 
+| Function | Notes |
+|---|---|
+| `update_sensors()` | Emitters off → read ambient; front emitters on 50 µs → read; side emitters on 80 µs → read; store `on − off`; compare with `WALL_THRESHOLD_*`. |
+| `read_adc_channel(ch)` | One dummy + one real conversion, 480-cycle sampling. |
+| `update_sensors4()` | Slower, averaged per-sensor variant (not used). |
+| `calibrate_sensors()` | Measures ambient and differential response, computes thresholds (currently not applied, see `if (false)` in `update_sensors()`). |
+| `adc_system_diagnostics()`, `diagnostic_sensor_test()`, `send_detailed_sensor_status()` | Bench reports. |
 
-### 4. movement.c
+## gyro.c – MPU9250 over SPI2
 
-- **`move_forward()`**, **`turn_left()`**, **`turn_right()`**, **`turn_around()`**
-- Use encoder counts (TIM2/TIM4) for precise cell movement and 90° turns
-- Incorporate safety checks for walls
+| Function | Notes |
+|---|---|
+| `mpu9250_init()` | Reset, PLL clock, I2C off, 200 Hz sample rate, DLPF, ±500 °/s, ±4 g; checks WHO_AM_I = 0x70. |
+| `mpu9250_calibrate_bias()` | 100 samples, 3 ms apart, average Z bias. |
+| `mpu9250_read_gyro()` | Burst-reads gyro registers, stores Z only. |
+| `mpu9250_get_gyro_z_compensated()` | `(raw − bias) / 65.5` °/s. |
 
+## communication.c, audio.c, utils.c
 
-### 5. sensors.c
+- `send_bluetooth_message()` / `send_bluetooth_printf()`: blocking USART6
+  transmit (256-byte format buffer). Exploration code uses the `TLM_INFO()` /
+  `TLM_VERBOSE()` wrappers from `micromouse.h`.
+- `send_maze_state()`: distance grid of visited cells, top row first.
+- `play_tone()` and tone sequences block for their duration.
+  `play_wall_beep()` / `play_turn_beep()` are silent unless `AUDIO_FEEDBACK=1`.
+- `led_sequence_*()`: blocking LED patterns. `system_health_check()`: battery,
+  sensors not all zero, gyro WHO_AM_I.
 
-- **`update_sensors()`**
-- Reads ADC channels PA0, PA2–PA5 to populate `sensors.front_left`, etc.
-- Sets `sensors.wall_front`, `.wall_left`, `.wall_right` based on thresholds
+## logging_tests.c – identification tests
 
+All take `(base_pwm, delta_pwm, step_delay_ms, step_duration_ms, sample_ms,
+total_ms)` and stream CSV over Bluetooth:
+`run_gyro_step_test()`, `run_encoder_step_test()`, `run_gyro_turn_step_test()`,
+`run_wall_lateral_step_test()`, `run_wall_single_left_step_test()`.
+`run_wf_relay_test()` runs a relay test on the wall loop. Fit the logs with the
+Python scripts in `Core/` (see README).
 
-### 6. audio.c
+## Debug workflow
 
-- **`play_startup_tone()`, `play_confirmation_tone()`, `play_success_tone()`, `play_error_tone()`**
-- Generate PWM signals on TIM1_CH3 to drive buzzer
+1. **Serial link.** Open a terminal at 9600 baud. For full logs build with
+   `-DTELEMETRY_LEVEL=2`. Remember that verbose output slows the run.
+2. **Start-up check.** Look for `MPU9250 init OK`, the gyro bias line,
+   `Encoders initialized` and a non-zero sensor line. A health-check warning
+   does not stop the robot.
+3. **Sensors.** Call `update_sensors()` + `send_sensor_data()` in a loop
+   (`USER CODE BEGIN 2`), move a wall by hand, and check readings cross the
+   thresholds in `micromouse.h:37`.
+4. **Encoders.** `test_encoder_rotation()`; turn each wheel forward by hand —
+   both totals must change in the same direction.
+5. **Straight line.** Run `move_forward_distance(2460, 2460)` alone; adjust
+   `LEFT/RIGHT_ENCODER_COUNTS_PER_CELL` if the robot does not end on the next
+   cell centre.
+6. **Turns.** Call `turn_left()` / `turn_right()` on their own and check the
+   angle. Retune with `run_gyro_turn_step_test()` + `gyro_turns.py` if needed.
+7. **Logic.** Change exploration code? Run the simulator first:
+   `cd tools/sim && make && ./build/sim --random 200 1`. All mazes must end
+   `ok=` with `crashes=0`.
+8. **Breakpoints.** Useful spots: `update_maze_walls()`, `get_best_direction()`,
+   `turn_in_place_gyro()` settle check, `HAL_GPIO_EXTI_Callback()`.
 
+Common issues:
 
-### 7. communication.c
-
-- **`send_bluetooth_message(const char*)`**
-- Transmits null-terminated string over USART6
-- **`send_bluetooth_printf(const char*, ...)`**
-- `sprintf`-style formatted output for telemetry
-
-
-### 8. gyro.c
-
-- **`mpu9250_init()`**
-- Configures MPU9250 registers via SPI2
-- **`mpu9250_read_gyro()`, `mpu9250_read_accel()`**
-- Read raw IMU data into `gyro` struct
-- **`mpu9250_detect_turn()`**
-- Uses `fabsf(gyro_z_dps) > 50.0f` to detect rotational motion
-
-
-### 9. utils.c
-
-- Helper routines: `map_value()`, `constrain_int()`, `performance_start_timer()`, etc.
-
-### 10. logging_tests.c
-
-- **`test_sensor_readings()`**
-- Comprehensive sensor testing and calibration functions
-- Logs sensor data for analysis and debugging
-- **`performance_logging()`**
-- Records system performance metrics during operation
-- Helps optimize algorithm parameters for competition
-- **`debug_maze_state()`**
-- Outputs current maze knowledge and robot state
-- Useful for understanding exploration progress and decision making
-
-## 🔬 Data Analysis Tools
-
-### Python Analysis Scripts (Core Directory)
-- **`gyro_turns.py`**: Analyzes gyroscope data from CSV logs to optimize turn detection
-- **`pid.py`**: PID controller analysis and parameter tuning based on performance data
-
-### Performance Data Logs
-- **`log_encoder.csv`**: Encoder performance and calibration data
-- **`log_encoder2.csv`**: Extended encoder testing results  
-- **`log_encoder3.csv`**: Additional encoder validation data
-- **`log_gyro.csv`**: Gyroscope readings for drift analysis
-- **`log_gyro_turns.csv`**: Turn detection accuracy measurements
-
-These tools enable:
-- **Real-time Data Collection**: Automated logging during robot operation
-- **Offline Analysis**: Python scripts for detailed performance evaluation
-- **Parameter Optimization**: Data-driven tuning of sensor thresholds and movement parameters
-- **Competition Preparation**: Statistical analysis for consistent performance
-
-
-## 🐞 Debugging Workflow
-
-1. **Build \& Flash**
-    - Confirm 0 errors/warnings in CubeIDE
-    - Flash `.hex` to board via ST-Link
-2. **Verify Basic Peripherals**
-    - LEDs blink on startup
-    - Buttons toggle `button_pressed` (set breakpoints in `HAL_GPIO_EXTI_Callback`)
-    - Speaker emits startup tone
-    - Bluetooth prints “Championship Micromouse Ready!”
-3. **Sensor Tests**
-    - Trigger wallFront, wallLeft, wallRight flags
-    - Place wall at known distances, verify flags toggle
-    - Log ADC raw values with `send_bluetooth_printf()`
-4. **Motor \& Encoder**
-    - Call `move_forward()` alone—verify one cell movement corresponds to encoder counts
-    - Call `turn_left()` / `turn_right()`—verify 90° turns via IMU (`mpu9250_detect_turn()`)
-5. **Maze Exploration**
-    - Start exploration mode (left button)
-    - Monitor Bluetooth logs:
-        - “Walls updated at (x,y) F:L:R”
-        - “Championship flood fill: N updates”
-        - “Championship direction: D”
-    - Confirm robot explores and returns
-6. **Path Analysis**
-    - Upon return, logs from `championship_analysis.c`:
-        - Exploration efficiency %
-        - Best path steps
-        - Distance map
-    - Verify printed map matches expected visited cells
-7. **Speed Run**
-    - After exploration, press left button again
-    - System uses optimal path calculated during exploration
-    - Monitor acceleration and movement timing
-8. **Debug Functions**
-    - Use functions in `logging_tests.c` for detailed debugging
-    - Test individual sensors with `test_sensor_readings()`
-    - Monitor performance with `performance_logging()`
-    - Export data to CSV files for offline analysis
-9. **Data Analysis**
-    - Use `gyro_turns.py` to analyze turn performance from CSV logs
-    - Run `pid.py` for PID controller optimization
-    - Review CSV files for sensor calibration and performance trends
-10. **IMU Verification**
-    - Use `mpu9250_detect_turn()` prints to confirm gyro integration during turns
-
-## 🛠 Tips \& Tricks
-
-- **Set Breakpoints** in user-code regions in CubeIDE to step through algorithm decisions.
-- **Use Serial Plotter** (e.g. PuTTY, CoolTerm) for live sensor and position graphs.
-- **Scope Signals**: verify PWM on speaker and motors with oscilloscope.
-- **Comment Out** modules (e.g. remove `speed_run()`) to isolate bugs.
-- **Adjust Thresholds** in `micromouse.h` when false positives occur.
-- **Data Analysis Workflow**: 
-  - Export sensor/performance data to CSV during testing
-  - Use Python scripts for offline analysis and parameter optimization
-  - Import optimized parameters back into embedded code
-- **Systematic Testing**: Use logging functions to validate each subsystem independently
-
-You now have a complete function reference and structured debugging plan to validate every subsystem—from hardware to championship algorithms—and ensure reliability in international competition. Good luck!
-
-## 🔄 Recent Updates (August 29, 2025)
-
-### Current Implementation Status:
-- **Core modules implemented**: All basic micromouse functionality is complete
-- **`logging_tests.h/.c`**: Comprehensive debugging and testing functions
-- **Hardware Integration**: Full STM32F411 peripheral support with optimized drivers
-
-### Architecture Features:
-- **Modular Design**: Clean separation between sensors, movement, algorithms, and communication
-- **Professional Documentation**: Updated function reference and debugging guides
-- **Robust Testing**: Integrated test functions for validation and debugging
-- **Competition Ready**: All essential features implemented for micromouse competitions
-
-### File Structure Updates:
-- All documented modules are implemented and functional
-- Logging and testing capabilities integrated throughout
-- Enhanced debugging workflows for development and competition preparation
-- Professional code organization following embedded systems best practices
-
-<div style="text-align: center">⁂</div>
-
-[^1]: README-3.md
-
-[^2]: image.jpg
-
+- Robot "sees" walls that are not there: raise `WALL_THRESHOLD_*`; check
+  ambient IR light (readings are differential but strong sunlight saturates).
+- Overshoot or undershoot on turns: check battery first, then the turn
+  shaping constants near `movement.c:560`.
+- Robot drifts on long straights with no walls: re-run gyro bias calibration
+  with the robot completely still.
+- CubeMX regeneration: keep code inside `USER CODE BEGIN/END` blocks.
