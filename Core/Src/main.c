@@ -304,116 +304,18 @@ int main(void)
   last_status_time = HAL_GetTick();
   last_blink_time = HAL_GetTick();
 
-  //calibrate_sensors();
-
-
-
-//  while (!start_flag) {
-//      HAL_Delay(10);
-//      HAL_GPIO_TogglePin(LED_LEFT_GPIO_Port, LED_LEFT_Pin); // Blink indicator
-//  }
-
-
-    // run a left-turn step test
-  //r// base, delta, delay_before_step(ms), step_duration(ms), sample_ms, total_ms
-//  run_gyro_step_test(700, 200, 1000, 2000, 5, 7000);   // +delta (turn one way)
-//  HAL_Delay(1500);
-//  run_gyro_step_test(700,-200, 1000, 2000, 5, 7000);   // -delta (turn the other way)
-//  HAL_Delay(1500);
-//  run_gyro_step_test(600, 200, 1000, 2000, 5, 7000);   // check base dependence
-//  HAL_Delay(1500);
-//  run_gyro_step_test(800, 200, 1000, 2000, 5, 7000);
-//
-//  run_gyro_turn_step_test(/*base_pwm=*/700,
-//                          /*delta_pwm=*/120,
-//                          /*step_delay_ms=*/1000,
-//                          /*step_duration_ms=*/1500,
-//                          /*sample_ms=*/5,
-//                          /*total_ms=*/3500);
-
-
-
-   //use gyro PID/////////////////////////////////////////////////////////////
-//  moveStraightGyroPID_Reset();
-//  //moveStraightPID_Reset();
-//  int left=0;
-//  int right=0;
-//  while(left*(-1)<=2555 || right*(-1)<=2539){
-//	  mpu9250_read_gyro();
-//	  left=get_left_encoder_total();
-//	  right=get_right_encoder_total();
-//	  moveStraightGyroPID();
-//	  //send_bluetooth_printf("L:%ld R:%ld\r\n",left,right);
-//  }
-//  break_motors();
-
-
-  // Sensor Fusion///////////////////////////////////////////////////////////////////////
-  // use single fusion straight controller
-//  fusion_reset();
-//  fusion_set_heading_ref_to_current();  // lock heading for this straight
-//
-//  while (1) {
-//      fusion_step(570);                 // pick your cruise PWM (or 0 to use WF_BASE_PWM)
-//      // optional telemetry
-//      // send_bluetooth_printf("L:%ld R:%ld\r\n", get_left_encoder_total(), get_right_encoder_total());
-//      HAL_Delay(2);                     // ~500 Hz outer loop
-//  }
-
-
-  // 0 = auto (both → center; else follow visible side), 1 = left, 2 = right
-//  int mode = 0;               // WF_AUTO
-//  int base_pwm = 570;         // use the speed you tuned at
-//
-//    // bootstrap targets & reset integrators
-//  	wall_follow_reset_int(mode, base_pwm);
-//
-//	while (1) {
-//		wall_follow_step();     // computes e, PID, sets motor PWMs
-//		//HAL_Delay(200);           // keep a steady loop
-//		dwt_delay_us(50);
-//
-//	}
-  //turn_left();
-
-//  debug_encoder_setup();
-//  test_encoder_manual();
-//  test_encoder_rotation();
-
-
-  /* Initialize movement system */
-//  while(1){
-//	  send_encoder_status();
-//	  HAL_Delay(500);
-//  }
-
-  // get ADC Values//////////////////////////////////////////////////////
-
-//  while(1){
-//	  //update_sensors();
-//	  update_maze_walls();
-//
-//	  HAL_Delay(500);
-//  }
-
-//  run_wall_single_left_step_test(   // correct one to use with one wall
-//      /*base_pwm=*/650,
-//      /*delta_pwm=*/150,
-//      /*step_delay_ms=*/1000,
-//      /*step_duration_ms=*/2000,
-//      /*sample_ms=*/10,      // 100 Hz; use 20 if BLE is slow
-//      /*total_ms=*/6000
-//  );
-
-
-  //  run_wall_lateral_step_test(
-  //      /*base_pwm=*/500,   /*delta_pwm=*/150,
-  //      /*step_delay_ms=*/1000, /*step_duration_ms=*/2000,
-  //      /*sample_ms=*/10,   /*total_ms=*/6000);
-
-  //turn_left();
-
-
+  // Bench tests used during tuning live in logging_tests.c, sensors.c and
+  // movement.c.
+  // To run one, call it here instead of starting exploration, e.g.:
+  //   calibrate_sensors();
+  //   run_gyro_step_test(700, 200, 1000, 2000, 5, 7000);
+  //   run_gyro_turn_step_test(700, 120, 1000, 1500, 5, 3500);
+  //   run_wall_single_left_step_test(650, 150, 1000, 2000, 10, 6000);
+  //   run_wall_lateral_step_test(500, 150, 1000, 2000, 10, 6000);
+  //   test_encoder_rotation();   // turn the wheels by hand, watch counts
+  // Arguments: base_pwm, delta_pwm, step_delay_ms, step_duration_ms,
+  //            sample_ms, total_ms. Output is CSV over Bluetooth; the
+  //            Python scripts in Core/ fit PID gains from those logs.
 
   /* USER CODE END 2 */
 

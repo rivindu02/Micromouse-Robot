@@ -428,44 +428,9 @@ void calibrate_sensors(void)
     send_bluetooth_printf("Battery baseline: %d (%.2fV)\r\n",
                          sensor_cal.battery_baseline, battery_voltage);
 
-    // Phase 6: Sensor Health Validation
-//    send_bluetooth_message("Phase 6: Sensor health validation\r\n");
-//
+    // Phase 6: Health validation. Per-sensor checks were disabled earlier,
+    // so only the battery decides calibration_valid.
     bool all_sensors_healthy = true;
-//
-//    // Check each sensor
-//    const char* sensor_names[4] = {"Front Left", "Front Right", "Side Left", "Side Right"};
-//
-//    for (int i = 0; i < 4; i++) {
-//        bool sensor_healthy = true;
-//
-//        // Check if sensor shows reasonable differential response
-//        if (differential[i] < 50) {
-//            send_bluetooth_printf("⚠️ %s: Low differential response (%d)\r\n",
-//                                 sensor_names[i], differential[i]);
-//            sensor_healthy = false;
-//        }
-//
-//        // Check noise levels
-//        if (sensor_cal.noise_levels[i] > 200) {
-//            send_bluetooth_printf("⚠️ %s: High noise level (%.1f)\r\n",
-//                                 sensor_names[i], sensor_cal.noise_levels[i]);
-//            sensor_healthy = false;
-//        }
-//
-//        // Check if readings are within reasonable ADC range
-//        if (sensor_cal.ambient_baseline[i] > 3800 || sensor_cal.ambient_baseline[i] < 10) {
-//            send_bluetooth_printf("⚠️ %s: Ambient reading out of range (%d)\r\n",
-//                                 sensor_names[i], sensor_cal.ambient_baseline[i]);
-//            sensor_healthy = false;
-//        }
-//
-//        if (sensor_healthy) {
-//            send_bluetooth_printf("✅ %s: Healthy\r\n", sensor_names[i]);
-//        } else {
-//            all_sensors_healthy = false;
-//        }
-//    }
 
     // Check battery
     if (battery_voltage < 3.0f) {

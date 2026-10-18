@@ -39,17 +39,18 @@ void send_maze_state(void)
 
     // Send maze in ASCII format
     for (int y = MAZE_SIZE - 1; y >= 0; y--) {
-        char line[64] = "";
+        // 4 chars per cell + "\r\n" + NUL (the old 64-byte buffer overflowed)
+        char line[MAZE_SIZE * 4 + 3];
+        int len = 0;
         for (int x = 0; x < MAZE_SIZE; x++) {
-            char cell[8];
             if (maze[x][y].visited) {
-                sprintf(cell, "%3d ", maze[x][y].distance < MAX_DISTANCE ? maze[x][y].distance : 999);
+                len += snprintf(line + len, sizeof(line) - len, "%3d ",
+                                maze[x][y].distance < MAX_DISTANCE ? maze[x][y].distance : 999);
             } else {
-                sprintf(cell, " -- ");
+                len += snprintf(line + len, sizeof(line) - len, " -- ");
             }
-            strcat(line, cell);
         }
-        strcat(line, "\r\n");
+        snprintf(line + len, sizeof(line) - len, "\r\n");
         send_bluetooth_message(line);
     }
 

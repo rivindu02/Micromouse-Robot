@@ -176,8 +176,9 @@ bool system_health_check(void)
     }
 
     // Check gyroscope communication
+    // Same WHO_AM_I value mpu9250_init() accepts (this board's IMU answers 0x70)
     uint8_t gyro_id = mpu9250_read_register(0x75);
-    if (gyro_id != 0x71) {
+    if (gyro_id != 0x70) {
         send_bluetooth_message("WARNING: Gyroscope communication issue!\r\n");
         health_ok = false;
     }

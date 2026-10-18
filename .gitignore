@@ -1,0 +1,19 @@
+# STM32CubeIDE build output (regenerated on every build)
+Debug/
+Release/
+*.o
+*.d
+*.su
+*.cyclo
+*.elf
+*.map
+*.list
+*.hex
+*.bin
+
+# Host simulator build output
+tools/sim/build/
+
+# Python
+__pycache__/
+*.pyc
