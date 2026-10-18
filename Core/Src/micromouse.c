@@ -194,17 +194,20 @@ void flood_fill_algorithm(void) {
 int get_best_direction(void) {
     int best_dir = robot.direction;
     int min_distance = MAX_DISTANCE;
-    int min_visits = 999;
-    bool found_unvisited = false;
+    int min_visits = 0;
+    bool found_open = false;
 
-    // Direction priority: forward, right, left, backward
+    // Direction priority: forward, right, left, backward.
+    // Earlier entries win ties, so going straight (no turn) is preferred.
     int priority[4];
     priority[0] = robot.direction;                    // Forward
     priority[1] = (robot.direction + 1) % 4;         // Right
     priority[2] = (robot.direction + 3) % 4;         // Left
     priority[3] = (robot.direction + 2) % 4;         // Backward
 
-    // First pass: prioritize unvisited cells
+    // Always step to the open neighbour with the lowest flood fill distance.
+    // Among equal distances, take the least visited cell (unvisited first),
+    // then the earliest direction in the priority list.
     for (int p = 0; p < 4; p++) {
         int dir = priority[p];
 
@@ -217,46 +220,25 @@ int get_best_direction(void) {
         // Check bounds
         if (nx < 0 || nx >= MAZE_SIZE || ny < 0 || ny >= MAZE_SIZE) continue;
 
-        // Prioritize unvisited cells
-        if (maze[nx][ny].visit_count == 0) {
-            found_unvisited = true;
-            if (maze[nx][ny].distance < min_distance) {
-                min_distance = maze[nx][ny].distance;
-                best_dir = dir;
-            }
-        }
-    }
+        int nd = maze[nx][ny].distance;
+        int nv = maze[nx][ny].visit_count;
 
-    // Second pass: if no unvisited cells, choose based on distance and visit count
-    if (!found_unvisited) {
-        for (int p = 0; p < 4; p++) {
-            int dir = priority[p];
-
-            if (maze[robot.x][robot.y].walls[dir]) continue;
-
-            int nx = robot.x + dx[dir];
-            int ny = robot.y + dy[dir];
-
-            if (nx < 0 || nx >= MAZE_SIZE || ny < 0 || ny >= MAZE_SIZE) continue;
-
-            int nd = maze[nx][ny].distance;
-            int nv = maze[nx][ny].visit_count;
-
-            // Choose cell with minimum distance, then minimum visits, then prefer forward
-            if (nd < min_distance ||
-                (nd == min_distance && nv < min_visits) ||
-                (nd == min_distance && nv == min_visits && dir == robot.direction)) {
-                min_distance = nd;
-                min_visits = nv;
-                best_dir = dir;
-            }
+        if (!found_open || nd < min_distance || (nd == min_distance && nv < min_visits)) {
+            found_open = true;
+            min_distance = nd;
+            min_visits = nv;
+            best_dir = dir;
         }
     }
 
     return best_dir;
 }
-int l=0;
-int r=0;
+/* Hardware-tuned encoder counts for the first cell after a turn. Each turn
+ * starts with a 957-count move (or a front-wall align), so the next cell
+ * needs a shorter distance. turn_to_direction() sets them and
+ * move_forward_one_cell_truns() uses them once, then clears them. */
+static int pending_left_counts = 0;
+static int pending_right_counts = 0;
 
 /**
  * @brief Turn robot to face the specified direction
@@ -273,24 +255,24 @@ void turn_to_direction(int target_direction) {
             // Turn right (90 degrees clockwise)
             send_bluetooth_message("Turning RIGHT...\r\n");
             turn_right();
-            l=1549;
-            r=1537;
+            pending_left_counts=1549;
+            pending_right_counts=1537;
             play_turn_beep();
             break;
         case 2:
             // Turn around (180 degrees)
             send_bluetooth_message("Turning AROUND...\r\n");
             turn_around();
-            l=1530;
-            r=1562;
+            pending_left_counts=1530;
+            pending_right_counts=1562;
             play_turn_beep();
             break;
         case 3:
             // Turn left (90 degrees counter-clockwise)
             send_bluetooth_message("Turning LEFT...\r\n");
             turn_left();
-            l=1330;
-            r=1352;
+            pending_left_counts=1330;
+            pending_right_counts=1352;
             play_turn_beep();
             break;
     }
@@ -331,7 +313,9 @@ bool move_forward_one_cell(void) {
 
     return true;
 }
-int flag=1;
+/* The first move out of the start cell uses a shorter, hardware-tuned
+ * distance (1200 counts) instead of a full cell. */
+static int first_move = 1;
 
 bool move_forward_one_cell_truns(void){
     send_bluetooth_printf("Moving forward from (%d,%d) to ", robot.x, robot.y);
@@ -347,15 +331,15 @@ bool move_forward_one_cell_truns(void){
     }
 
     send_bluetooth_printf("(%d,%d)\r\n", new_x, new_y);
-    if (l!=0 && r!=0){
-    	move_forward_distance(l,r);
-    	l=0;
-    	r=0;
+    if (pending_left_counts!=0 && pending_right_counts!=0){
+    	move_forward_distance(pending_left_counts,pending_right_counts);
+    	pending_left_counts=0;
+    	pending_right_counts=0;
     }
     else if (sensors.wall_left || sensors.wall_right){
-    	if (flag==1){
+    	if (first_move==1){
     		move_forward_WF_distance(1200,1200);
-    		flag=0;
+    		first_move=0;
     	}else{
     		move_forward_WF_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
     	}
@@ -363,9 +347,9 @@ bool move_forward_one_cell_truns(void){
 
 
     }else{
-    	if (flag==1){
+    	if (first_move==1){
 			move_forward_distance(1200 ,1200);
-			flag=0;
+			first_move=0;
     	}else{
     		move_forward_distance(LEFT_ENCODER_COUNTS_PER_CELL ,RIGHT_ENCODER_COUNTS_PER_CELL);
     	}
@@ -455,9 +439,9 @@ void update_maze_walls(void) {
         play_wall_beep();
     }
 
-    // Mark current cell as visited
+    // Mark current cell as visited. visit_count is incremented once per
+    // arrival in move_forward_one_cell*(), not again here.
     maze[robot.x][robot.y].visited = true;
-    maze[robot.x][robot.y].visit_count++;
 }
 
 /**
