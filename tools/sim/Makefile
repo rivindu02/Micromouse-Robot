@@ -1,7 +1,7 @@
 # Host build of the maze simulator. Uses the real firmware sources in CORE.
 #   make            build build/sim
 #   make run        run on 200 generated mazes
-#   make gif        regenerate docs/exploration.gif (needs Python + Pillow)
+#   make gif        regenerate docs/exploration.gif on mazes/two-routes.txt (needs Pillow)
 #   make CORE=/path/to/other/checkout/Core   compare another version
 
 CORE   ?= ../../Core
@@ -18,7 +18,7 @@ run: build/sim
 	./build/sim -v --random 200 1
 
 gif: build/sim
-	./build/sim --random 1 27 --trace build/trace.txt
+	./build/sim mazes/two-routes.txt --trace build/trace.txt
 	python3 render_gif.py build/trace.txt ../../docs/exploration.gif
 
 clean:
