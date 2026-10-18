@@ -12,6 +12,13 @@ centre with flood fill, then returns to start.
 - Tuning tools: Python scripts and CSV logs in `Core/`
 - Maze simulator for the exploration logic: `tools/sim/`
 
+![Simulated exploration: the robot maps a 16x16 maze to the centre and back](docs/exploration.gif)
+
+*Firmware maze logic running in the host simulator (`tools/sim`, `make gif`).
+Red: walls the robot has sensed. Blue shading: flood fill distance to the
+goal. Cyan: path to the centre. Amber: path back. Green: shortest path the
+robot knows at the end.*
+
 Detailed per-function notes: [Function Reference & Debug Guide](<Micromouse – Function Reference & Debug.md>).
 
 ## Hardware

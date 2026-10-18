@@ -1,6 +1,7 @@
 # Host build of the maze simulator. Uses the real firmware sources in CORE.
 #   make            build build/sim
 #   make run        run on 200 generated mazes
+#   make gif        regenerate docs/exploration.gif (needs Python + Pillow)
 #   make CORE=/path/to/other/checkout/Core   compare another version
 
 CORE   ?= ../../Core
@@ -16,7 +17,11 @@ build/sim: $(SRCS) stub/stm32f4xx_hal.h
 run: build/sim
 	./build/sim -v --random 200 1
 
+gif: build/sim
+	./build/sim --random 1 7 --trace build/trace.txt
+	python3 render_gif.py build/trace.txt ../../docs/exploration.gif
+
 clean:
 	rm -rf build
 
-.PHONY: run clean
+.PHONY: run gif clean

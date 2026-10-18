@@ -31,6 +31,16 @@ make                                # builds build/sim with ASan + UBSan
 make CORE=/path/to/other/Core       # build against another firmware version
 ```
 
+## Animation
+
+```sh
+make gif    # sim --trace on generated maze 7, then render_gif.py -> docs/exploration.gif
+```
+
+`--trace out.txt` logs the true maze, every sensor read (`S x y dir`) and every
+move with the firmware's flood fill distances (`M x y dir phase d0..d255`).
+`render_gif.py` turns that log into a GIF (needs Pillow).
+
 Classic competition mazes in the expected text format are available at
 <https://github.com/micromouseonline/mazefiles> (`classic/` folder). They are
 not copied into this repo.

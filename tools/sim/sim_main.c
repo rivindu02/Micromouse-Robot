@@ -13,7 +13,8 @@
  * Usage:
  *   sim <maze.txt> [...]          run on maze files (mazefiles text format)
  *   sim --random <count> [seed]   run on generated 16x16 mazes
- *   add -v to print the per-maze table, -t to echo UART text
+ *   add -v to print the per-maze table, -t to echo UART text,
+ *   --trace out.txt to log every sense/move for render_gif.py
  */
 
 #include "micromouse.h"
@@ -58,6 +59,7 @@ typedef struct {
 static SimStats st;
 static uint64_t sim_ms = 0;
 static int echo_uart = 0;
+static FILE *trace = NULL;   /* --trace: event log for render_gif.py */
 
 /* ---------------- HAL stubs ---------------- */
 void HAL_Delay(uint32_t ms) { sim_ms += ms; st.delay_ms += ms; }
@@ -91,6 +93,7 @@ void update_sensors(void)
     sensors.wall_right = wall_rel(1);
     sensors.wall_left  = wall_rel(3);
     sensors.battery = 4000;
+    if (trace) fprintf(trace, "S %d %d %d\n", robot.x, robot.y, robot.direction);
 }
 
 static void drive_one_cell(void)
@@ -98,6 +101,13 @@ static void drive_one_cell(void)
     /* micromouse.c updates robot.x/y itself after the move returns */
     st.cells++;
     if (true_wall[robot.x][robot.y][robot.direction]) st.crashes++;
+    if (trace) {
+        /* pose before the move + the flood fill distances that chose it */
+        fprintf(trace, "M %d %d %d %d", robot.x, robot.y, robot.direction, robot.center_reached ? 1 : 0);
+        for (int y = 0; y < MAZE_SIZE; y++)
+            for (int x = 0; x < MAZE_SIZE; x++) fprintf(trace, " %d", maze[x][y].distance);
+        fputc('\n', trace);
+    }
 }
 
 void move_forward_distance(int l, int r) { (void)l; (void)r; drive_one_cell(); }
@@ -250,13 +260,17 @@ int main(int argc, char **argv)
     for (int i = 1; i < argc; i++) {
         if (!strcmp(argv[i], "-v")) verbose = 1;
         else if (!strcmp(argv[i], "-t")) echo_uart = 1;
+        else if (!strcmp(argv[i], "--trace") && i + 1 < argc) {
+            trace = fopen(argv[++i], "w");
+            if (!trace) { perror(argv[i]); return 2; }
+        }
         else if (!strcmp(argv[i], "--random") && i + 1 < argc) {
             nrandom = atoi(argv[++i]);
             if (i + 1 < argc && argv[i + 1][0] != '-') seed = (uint32_t)strtoul(argv[++i], NULL, 10);
         } else if (nfiles < 4096) files[nfiles++] = argv[i];
     }
     int total = nfiles + nrandom;
-    if (total == 0) { fprintf(stderr, "usage: %s [-v] [-t] <maze.txt>... | --random N [seed]\n", argv[0]); return 2; }
+    if (total == 0) { fprintf(stderr, "usage: %s [-v] [-t] [--trace out.txt] <maze.txt>... | --random N [seed]\n", argv[0]); return 2; }
 
     if (verbose)
         printf("%-28s %6s %5s %5s %5s %8s %9s %6s %6s %s\n",
@@ -274,7 +288,16 @@ int main(int argc, char **argv)
             generate_maze(s);
             snprintf(name, sizeof name, "random-%u", s);
         }
+        if (trace) {
+            /* true walls, one line per cell: x y N E S W */
+            fprintf(trace, "MAZE %s\n", name);
+            for (int y = 0; y < MAZE_SIZE; y++)
+                for (int x = 0; x < MAZE_SIZE; x++)
+                    fprintf(trace, "W %d %d %d %d %d %d\n", x, y, true_wall[x][y][NORTH],
+                            true_wall[x][y][EAST], true_wall[x][y][SOUTH], true_wall[x][y][WEST]);
+        }
         RunResult r = run_once();
+        if (trace) fprintf(trace, "END %d %d %d\n", robot.x, robot.y, robot.direction);
         bool good = r.center && r.home && r.s.crashes == 0;
         ok += good;
         crashes += r.s.crashes;
