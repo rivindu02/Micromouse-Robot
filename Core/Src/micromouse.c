@@ -127,6 +127,94 @@ void initialize_maze_exploration(void) {
     send_bluetooth_message("==========================================\r\n");
 }
 
+/* Scratch distance maps for path planning (2 KB of RAM) */
+static int dist_from_start[MAZE_SIZE][MAZE_SIZE];
+static int dist_from_centre[MAZE_SIZE][MAZE_SIZE];
+
+static bool is_centre_cell(int x, int y) {
+    return (x == maze_center_x1 || x == maze_center_x2) &&
+           (y == maze_center_y1 || y == maze_center_y2);
+}
+
+/**
+ * @brief Breadth-first distances over the known walls
+ * @param dist         output, MAX_DISTANCE where unreachable
+ * @param from_centre  true: seed the four centre cells, false: seed the start cell
+ * @param visited_only true: only step into visited cells (their walls are all
+ *                     known, so the result is a real path); false: unknown
+ *                     walls count as open (optimistic)
+ */
+static void bfs_distances(int dist[MAZE_SIZE][MAZE_SIZE], bool from_centre, bool visited_only) {
+    for (int x = 0; x < MAZE_SIZE; x++)
+        for (int y = 0; y < MAZE_SIZE; y++)
+            dist[x][y] = MAX_DISTANCE;
+
+    queue_init(&bfs_queue);
+    if (from_centre) {
+        for (int x = maze_center_x1; x <= maze_center_x2; x++)
+            for (int y = maze_center_y1; y <= maze_center_y2; y++) {
+                dist[x][y] = 0;
+                queue_push(&bfs_queue, (Position){x, y});
+            }
+    } else {
+        dist[0][0] = 0;
+        queue_push(&bfs_queue, (Position){0, 0});
+    }
+
+    while (!queue_empty(&bfs_queue)) {
+        Position c = queue_pop(&bfs_queue);
+        for (int dir = 0; dir < 4; dir++) {
+            if (maze[c.x][c.y].walls[dir]) continue;
+            int nx = c.x + dx[dir];
+            int ny = c.y + dy[dir];
+            if (nx < 0 || nx >= MAZE_SIZE || ny < 0 || ny >= MAZE_SIZE) continue;
+            if (visited_only && !maze[nx][ny].visited) continue;
+            if (dist[nx][ny] != MAX_DISTANCE) continue;
+            dist[nx][ny] = dist[c.x][c.y] + 1;
+            queue_push(&bfs_queue, (Position){nx, ny});
+        }
+    }
+}
+
+/**
+ * @brief Seed the return-trip flood fill with unproven shortest-path cells
+ *
+ * The known shortest path uses visited cells only. The optimistic one
+ * treats unknown walls as open, so it can never be longer than the true
+ * shortest path. While the known path is longer than the optimistic one,
+ * a shorter route may exist: it must pass through an unvisited cell where
+ * dist_from_start + dist_from_centre equals the optimistic length. The
+ * return trip visits those cells first. When the two lengths match, the
+ * known path is proven shortest and the robot heads home.
+ *
+ * @return number of cells pushed as flood fill goals (0 = proven, go home)
+ */
+static int seed_unproven_route_cells(void) {
+    bfs_distances(dist_from_centre, true, true);
+    int known = dist_from_centre[0][0];
+
+    bfs_distances(dist_from_start, false, false);
+    bfs_distances(dist_from_centre, true, false);
+
+    int best = MAX_DISTANCE;
+    for (int x = maze_center_x1; x <= maze_center_x2; x++)
+        for (int y = maze_center_y1; y <= maze_center_y2; y++)
+            if (dist_from_start[x][y] < best) best = dist_from_start[x][y];
+    if (best == MAX_DISTANCE || known == best) return 0;
+
+    queue_init(&bfs_queue);
+    int seeds = 0;
+    for (int x = 0; x < MAZE_SIZE; x++)
+        for (int y = 0; y < MAZE_SIZE; y++)
+            if (!maze[x][y].visited && !is_centre_cell(x, y) &&
+                dist_from_start[x][y] + dist_from_centre[x][y] == best) {
+                maze[x][y].distance = 0;
+                queue_push(&bfs_queue, (Position){x, y});
+                seeds++;
+            }
+    return seeds;
+}
+
 /**
  * @brief Flood fill algorithm implementation
  */
@@ -138,11 +226,9 @@ void flood_fill_algorithm(void) {
         }
     }
 
-    // Initialize queue
-    queue_init(&bfs_queue);
-
     // Set goal distances and add to queue
     if (!robot.center_reached) {
+        queue_init(&bfs_queue);
         // Heading to center
         maze[maze_center_x1][maze_center_y1].distance = 0;
         maze[maze_center_x2][maze_center_y1].distance = 0;
@@ -153,8 +239,9 @@ void flood_fill_algorithm(void) {
         queue_push(&bfs_queue, (Position){maze_center_x2, maze_center_y1});
         queue_push(&bfs_queue, (Position){maze_center_x1, maze_center_y2});
         queue_push(&bfs_queue, (Position){maze_center_x2, maze_center_y2});
-    } else {
-        // Returning to start
+    } else if (seed_unproven_route_cells() == 0) {
+        // Returning to start: every possible shortest route is explored
+        queue_init(&bfs_queue);
         maze[0][0].distance = 0;
         queue_push(&bfs_queue, (Position){0, 0});
     }
@@ -600,7 +687,76 @@ float get_exploration_efficiency(void) {
  * @brief Get optimal distance for current maze knowledge
  */
 int get_optimal_distance(void) {
-    // This would implement A* or similar for optimal path calculation
-    // For now, return the flood fill distance to center
-    return maze[0][0].distance;
+    // Shortest start-to-centre path through visited cells (known walls only)
+    bfs_distances(dist_from_centre, true, true);
+    return dist_from_centre[0][0] == MAX_DISTANCE ? -1 : dist_from_centre[0][0];
+}
+
+/**
+ * @brief Drive the shortest known path from the start cell to the centre
+ *
+ * Plans over visited cells only, so every wall on the path is known. Uses
+ * the same turn and move functions (and speed) as exploration; the gain
+ * comes from driving the shortest route with no detours.
+ *
+ * If the robot is not at the start cell (e.g. after a previous run), it
+ * assumes it was carried back by hand and placed in the start cell facing
+ * north, like at the beginning of a run.
+ *
+ * @return true when the centre was reached
+ */
+bool run_speed_run(void) {
+    if (!exploration_completed) {
+        TLM_INFO("Speed run needs a completed exploration first\r\n");
+        return false;
+    }
+
+    if (robot.x != 0 || robot.y != 0) {
+        robot.x = 0;
+        robot.y = 0;
+        robot.direction = NORTH;
+        first_move = 1;
+    }
+
+    bfs_distances(dist_from_centre, true, true);
+    if (dist_from_centre[0][0] == MAX_DISTANCE) {
+        TLM_INFO("❌ No known path to the centre\r\n");
+        play_error_tone();
+        return false;
+    }
+
+    TLM_INFO("\r\n⚡ SPEED RUN: %d cells ⚡\r\n", dist_from_centre[0][0]);
+    int saved_steps = robot.exploration_steps;
+    int moves = 0;
+
+    while (!is_centre_cell(robot.x, robot.y) && moves < MAZE_SIZE * MAZE_SIZE) {
+        // Next cell is one step closer to the centre; keep straight if possible
+        int here = dist_from_centre[robot.x][robot.y];
+        int next_dir = -1;
+        for (int t = 0; t < 4; t++) {
+            int dir = (robot.direction + (t == 0 ? 0 : t == 1 ? 1 : t == 2 ? 3 : 2)) % 4;
+            if (maze[robot.x][robot.y].walls[dir]) continue;
+            int nx = robot.x + dx[dir];
+            int ny = robot.y + dy[dir];
+            if (nx < 0 || nx >= MAZE_SIZE || ny < 0 || ny >= MAZE_SIZE) continue;
+            if (dist_from_centre[nx][ny] == here - 1) { next_dir = dir; break; }
+        }
+        if (next_dir < 0) break;
+
+        update_sensors();               // front wall for turn alignment, side walls for wall following
+        turn_to_direction(next_dir);
+        if (!move_forward_one_cell_truns()) break;
+        moves++;
+    }
+    robot.exploration_steps = saved_steps;
+
+    if (is_centre_cell(robot.x, robot.y)) {
+        TLM_INFO("🏆 SPEED RUN COMPLETE: %d cells\r\n", moves);
+        play_success_tone();
+        led_sequence_complete();
+        return true;
+    }
+    TLM_INFO("❌ Speed run stopped after %d cells\r\n", moves);
+    play_error_tone();
+    return false;
 }

@@ -2,7 +2,15 @@
 
 Firmware, PCB and CAD for a 16×16 classic micromouse built on an
 STM32F411CEU6. The robot explores the maze from the start corner to the
-centre with flood fill, then returns to start.
+centre with flood fill. On the way back it checks other routes until the
+shortest path is proven, then runs that path start to centre.
+
+<p align="center">
+  <a href="docs/media/robofest-2025-finals.mp4"><img src="docs/media/robofest-2025-finals.gif" height="300" alt="Robofest 2025 finals run"></a>
+  <a href="docs/media/arena-testing.mp4"><img src="docs/media/arena-testing.gif" height="300" alt="Testing in our arena"></a>
+  <img src="docs/media/robofest-2025-team.jpg" height="300" alt="Team at the Robofest 2025 finals">
+</p>
+<p align="center"><em>Left: Robofest 2025 finals run (3× speed). Middle: testing in our arena (2× speed). Click either clip for the full video. Right: the team at the Robofest 2025 finals.</em></p>
 
 - Firmware: STM32CubeIDE project (`Micromouse-Robot.ioc`, `Core/`, `Drivers/`)
 - Electronics: Altium schematics (`*.SchDoc`), PCB (`PCB1.PcbDoc`, `PCB/`),
@@ -12,12 +20,14 @@ centre with flood fill, then returns to start.
 - Tuning tools: Python scripts and CSV logs in `Core/`
 - Maze simulator for the exploration logic: `tools/sim/`
 
-![Simulated exploration: the robot maps a 16x16 maze to the centre and back](docs/exploration.gif)
+<p align="center"><img src="docs/exploration.gif" alt="Simulated run: explore to the centre, check other routes on the way back, then speed run"></p>
 
-*Firmware maze logic running in the host simulator (`tools/sim`, `make gif`).
-Red: walls the robot has sensed. Blue shading: flood fill distance to the
-goal. Cyan: path to the centre. Amber: path back. Green: shortest path the
-robot knows at the end.*
+*The firmware's maze logic running in the host simulator (`tools/sim`,
+`make gif`). The first route to the centre (cyan) goes the long way round.
+On the way back (amber), the robot visits the cells in orange boxes, which
+could still hold a shorter route. It finds one, so the speed run (green)
+takes the shorter left-hand route. Red: walls the robot has sensed. Blue
+shading: flood fill distance to the current goal.*
 
 Detailed per-function notes: [Function Reference & Debug Guide](<Micromouse – Function Reference & Debug.md>).
 
@@ -81,8 +91,11 @@ robot stands still for roughly 0.4 s per cell just sending text.
 2. Keep it still: it calibrates the gyro bias during start-up (about 2 s after
    "KEEP ROBOT STATIONARY").
 3. Press the **left** button. The robot explores to the centre, plays the
-   success tone, then explores back to start.
-4. **Right** button before or after a run prints a status report (maze
+   success tone, then drives back to start, checking other routes on the way.
+4. Press the **left** button again for the speed run: shortest known path
+   from start to centre. For another speed run, carry the robot back to the
+   start cell facing north and press again.
+5. **Right** button before or after a run prints a status report (maze
    distances, sensors, encoders). The emergency-stop branch only runs between
    runs, because exploration blocks the main loop.
 
@@ -133,6 +146,18 @@ flowchart TD
 - `get_best_direction()` moves to the open neighbour with the **lowest
   distance**. Ties go to the least visited cell, then forward, right, left,
   back. Preferring forward avoids a stop-and-turn.
+- **Return trip proves the shortest path.** The known shortest path uses
+  only visited cells. The optimistic one treats unknown walls as open, so it
+  is never longer than the true shortest path. While the known path is longer,
+  a shorter route may exist through some unvisited cell where
+  distance-from-start + distance-to-centre equals the optimistic length.
+  The return flood fill targets those cells first
+  (`seed_unproven_route_cells()`). When the two lengths match, the robot
+  heads home.
+- **Speed run** (`run_speed_run()`): plans over visited cells only, then
+  drives start → centre with the same turn and move functions as exploration,
+  preferring straight at ties. It runs at exploration speed. The gain is the
+  shortest route with no detours.
 - Safety limit: `MAZE_SIZE² × 3` moves per phase.
 
 ### Motion controllers
@@ -197,19 +222,18 @@ a known maze. It measures the decision logic and idle time, not motion. See
 cd tools/sim && make && ./build/sim --random 200 1
 ```
 
-Mean per exploration run (centre and back), before → after the changes in
-this repository's `optimize-and-docs` work:
+Mean per run, original firmware → current:
 
-| Maze set | Cells driven | 90° turns | 180° turns | UART blocked | `HAL_Delay` |
-|---|---|---|---|---|---|
-| 200 generated mazes | 222.6 → 129.9 | 128.8 → 76.0 | 8.7 → 3.5 | 89.5 s → 0.8 s | 26.5 s → 10.5 s |
-| 523 classic contest mazes¹ | 242.6 → 195.8 | 107.2 → 86.1 | 11.9 → 9.1 | 96.6 s → 0.8 s | 27.0 s → 11.1 s |
+| Maze set | Exploration cells | 90° turns | 180° turns | UART blocked | `HAL_Delay` | Known path vs true shortest | Speed run |
+|---|---|---|---|---|---|---|---|
+| 200 generated mazes | 222.6 → 133.4 | 128.8 → 77.8 | 8.7 → 3.8 | 89.5 s → 0.8 s | 26.5 s → 10.5 s | +0.53 → **0** cells | 200/200 optimal, 42.9 cells |
+| 523 classic contest mazes¹ | 242.6 → 250.2 | 107.2 → 109.2 | 11.9 → 12.6 | 96.6 s → 0.8 s | 27.0 s → 11.7 s | +1.44 → **0** cells | 523/523 optimal, 59.3 cells |
 
-¹ From [micromouseonline/mazefiles](https://github.com/micromouseonline/mazefiles) `classic/`, not included here.
+¹ From [micromouseonline/mazefiles](https://github.com/micromouseonline/mazefiles) `classic/`, not included here. One more file has no path to the centre and is not counted.
 
-Trade-off: the robot now sees fewer cells, so on classic mazes the shortest
-path it knows at the end is on average 1.98 cells longer than the true
-shortest path (was 1.44). On generated mazes it is unchanged (0.52).
+On classic mazes, exploration now drives about 3 % more cells than the
+original firmware. In exchange, the robot always ends with the true shortest
+path, and the speed run drives it.
 
 ## PID identification tools
 
@@ -239,11 +263,11 @@ save the serial output as CSV and pass it to the script. The scripts need
 
 ## Known limitations and next steps
 
-- Every cell ends with a full stop, sensor read and flood fill. Continuous
-  moves and a speed run on the learned path are the next big gains; both
-  need on-track tuning.
-- The run stops at start after the return trip; it does not keep exploring
-  until the shortest path is proven.
+- Every cell ends with a full stop, sensor read and flood fill, also in the
+  speed run. Continuous moves, diagonals and higher speed on the speed run
+  are the next big gains; all of them need on-track tuning.
+- The speed run and the path-proving return trip are tested in the simulator
+  only, not yet on the robot.
 - `turn_in_place_gyro()` uses the straight-line gains `Kp_g/Ki_g/Kd_g` in its
   rate loop. The separately identified `Kp_t/Ki_t/Kd_t` are not used.
 - `turn_in_place_gyro()` clamps `base_pwm` to 60…400, so the 520 passed by the

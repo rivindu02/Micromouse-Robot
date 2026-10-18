@@ -23,7 +23,7 @@ Conventions used by the code:
 | `run_system_diagnostics()` | One sensor read, battery, gyro and encoder status, `system_health_check()`. Sets `system_ready = true` even when the check warns. |
 | `send_periodic_status()` | Battery report every 10 s while idle, LED heartbeat every 2 s. |
 | `HAL_GPIO_EXTI_Callback()` | 200 ms debounce. Left button → `button_pressed = 1`, right → `2`. |
-| Main loop | Left: start exploration (blocking) or print metrics after a run. Right: status report, or emergency stop if a run is marked active. |
+| Main loop | Left: start exploration (blocking); after exploration, start a speed run. Right: status report, or emergency stop if a run is marked active. |
 
 `USER CODE BEGIN 2` lists the bench tests you can call instead of running
 the maze.
@@ -33,7 +33,9 @@ the maze.
 | Function | Notes |
 |---|---|
 | `initialize_maze_exploration()` | Clears the maze, sets boundary walls, centre = cells (7,7)…(8,8), robot at (0,0) facing north. |
-| `flood_fill_algorithm()` | BFS from the goal over known walls (unknown = open). Goal is the four centre cells until `center_reached`, then the start cell. |
+| `flood_fill_algorithm()` | BFS from the goal over known walls (unknown = open). Goal is the four centre cells until `center_reached`. On the way back, the goal is the unproven route cells while there are any, then the start cell. |
+| `seed_unproven_route_cells()` | Return-trip goals: unvisited, non-centre cells where distance-from-start + distance-to-centre equals the optimistic shortest length, but only while the known (visited-only) path is longer. Returns 0 once the shortest path is proven. |
+| `bfs_distances()` | BFS helper from start or centre; optimistic (unknown walls open) or visited cells only. |
 | `get_best_direction()` | Open neighbour with the lowest distance; ties → least visited, then forward, right, left, back. Never returns a walled direction if any side is open. |
 | `turn_to_direction(dir)` | Calls `turn_right()`, `turn_left()` or `turn_around()` and loads the tuned first-cell counts for the next move. |
 | `move_forward_one_cell_truns()` | Drives one cell: post-turn counts if a turn just happened; else wall-follow (`move_forward_WF_distance`) when a side wall is seen, else gyro straight (`move_forward_distance`). First move from start uses 1200 counts. Updates position and `visit_count`. |
@@ -41,7 +43,8 @@ the maze.
 | `update_maze_walls()` | `update_sensors()`, then writes front/left/right walls into the current and neighbouring cell. |
 | `explore_maze()` | One phase: sense → flood fill → choose → turn → move, until goal or `MAZE_SIZE² × 3` moves. Sets `center_reached` / `returned_to_start`. |
 | `run_maze_exploration_sequence()` | Phase 1 to centre, 1 s pause, phase 2 back to start, then coverage report. |
-| `get_exploration_efficiency()`, `get_optimal_distance()` | Report values for `send_performance_metrics()`. |
+| `run_speed_run()` | After exploration: plans over visited cells only, drives start → centre with `turn_to_direction()` / `move_forward_one_cell_truns()`. If the robot is not at start, it assumes it was carried back and placed facing north. |
+| `get_exploration_efficiency()`, `get_optimal_distance()` | Report values for `send_performance_metrics()`. `get_optimal_distance()` is the known shortest path length. |
 | `dwt_delay_init()`, `dwt_delay_us()` | Busy-wait microsecond delay on the DWT cycle counter. |
 
 ## movement.c – motors, encoders, gyro motion
@@ -125,8 +128,8 @@ Python scripts in `Core/` (see README).
 6. **Turns.** Call `turn_left()` / `turn_right()` on their own and check the
    angle. Retune with `run_gyro_turn_step_test()` + `gyro_turns.py` if needed.
 7. **Logic.** Change exploration code? Run the simulator first:
-   `cd tools/sim && make && ./build/sim --random 200 1`. All mazes must end
-   `ok=` with `crashes=0`.
+   `cd tools/sim && make && ./build/sim --random 200 1`. All mazes must
+   be counted in `ok=`, with `crashes=0` and every speed run optimal.
 8. **Breakpoints.** Useful spots: `update_maze_walls()`, `get_best_direction()`,
    `turn_in_place_gyro()` settle check, `HAL_GPIO_EXTI_Callback()`.
 

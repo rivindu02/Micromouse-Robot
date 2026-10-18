@@ -60,6 +60,7 @@ static SimStats st;
 static uint64_t sim_ms = 0;
 static int echo_uart = 0;
 static FILE *trace = NULL;   /* --trace: event log for render_gif.py */
+static int speed_phase = 0;  /* 1 while run_speed_run() drives */
 
 /* ---------------- HAL stubs ---------------- */
 void HAL_Delay(uint32_t ms) { sim_ms += ms; st.delay_ms += ms; }
@@ -103,7 +104,8 @@ static void drive_one_cell(void)
     if (true_wall[robot.x][robot.y][robot.direction]) st.crashes++;
     if (trace) {
         /* pose before the move + the flood fill distances that chose it */
-        fprintf(trace, "M %d %d %d %d", robot.x, robot.y, robot.direction, robot.center_reached ? 1 : 0);
+        fprintf(trace, "M %d %d %d %d", robot.x, robot.y, robot.direction,
+                speed_phase ? 2 : robot.center_reached ? 1 : 0);
         for (int y = 0; y < MAZE_SIZE; y++)
             for (int x = 0; x < MAZE_SIZE; x++) fprintf(trace, " %d", maze[x][y].distance);
         fputc('\n', trace);
@@ -236,6 +238,8 @@ typedef struct {
     SimStats s;
     bool center, home;
     int known_path, true_path;
+    int speed_cells;    /* cells driven by run_speed_run(), -1 if not run */
+    bool speed_ok;      /* reached the centre on a true shortest path */
 } RunResult;
 
 static RunResult run_once(void)
@@ -246,7 +250,18 @@ static RunResult run_once(void)
     initialize_maze_exploration();
     run_maze_exploration_sequence();
     RunResult r = { st, robot.center_reached, robot.returned_to_start,
-                    shortest_path(true), shortest_path(false) };
+                    shortest_path(true), shortest_path(false), -1, false };
+
+    /* speed run from the start cell over the learned map */
+    if (r.home) {
+        int c0 = st.cells, k0 = st.crashes;
+        speed_phase = 1;
+        bool reached = run_speed_run();
+        speed_phase = 0;
+        r.speed_cells = st.cells - c0;
+        r.speed_ok = reached && st.crashes == k0 && r.speed_cells == r.true_path;
+        r.s.crashes = st.crashes;
+    }
     return r;
 }
 
@@ -273,10 +288,10 @@ int main(int argc, char **argv)
     if (total == 0) { fprintf(stderr, "usage: %s [-v] [-t] [--trace out.txt] <maze.txt>... | --random N [seed]\n", argv[0]); return 2; }
 
     if (verbose)
-        printf("%-28s %6s %5s %5s %5s %8s %9s %6s %6s %s\n",
-               "maze", "cells", "t90", "t180", "crash", "delay_s", "uart_s", "known", "best", "result");
+        printf("%-28s %6s %5s %5s %5s %8s %9s %6s %6s %6s %s\n",
+               "maze", "cells", "t90", "t180", "crash", "delay_s", "uart_s", "known", "best", "speed", "result");
     double sum_cells = 0, sum_t90 = 0, sum_t180 = 0, sum_delay = 0, sum_uart = 0, sum_gap = 0;
-    int ok = 0, crashes = 0, gap_n = 0, skipped = 0;
+    int ok = 0, crashes = 0, gap_n = 0, skipped = 0, speed_ok = 0, solvable = 0;
     for (int i = 0; i < total; i++) {
         char name[64];
         if (i < nfiles) {
@@ -298,22 +313,25 @@ int main(int argc, char **argv)
         }
         RunResult r = run_once();
         if (trace) fprintf(trace, "END %d %d %d\n", robot.x, robot.y, robot.direction);
-        bool good = r.center && r.home && r.s.crashes == 0;
+        bool good = r.center && r.home && r.s.crashes == 0 && r.speed_ok;
+        if (r.true_path > 0) solvable++;
+        speed_ok += r.speed_ok;
         ok += good;
         crashes += r.s.crashes;
         sum_cells += r.s.cells; sum_t90 += r.s.turns90; sum_t180 += r.s.turns180;
         sum_delay += r.s.delay_ms / 1000.0; sum_uart += uart_ms(r.s.uart_bytes) / 1000.0;
         if (r.known_path > 0 && r.true_path > 0) { sum_gap += r.known_path - r.true_path; gap_n++; }
         if (verbose)
-            printf("%-28s %6d %5d %5d %5d %8.1f %9.1f %6d %6d %s\n", name, r.s.cells, r.s.turns90,
+            printf("%-28s %6d %5d %5d %5d %8.1f %9.1f %6d %6d %6d %s\n", name, r.s.cells, r.s.turns90,
                    r.s.turns180, r.s.crashes, r.s.delay_ms / 1000.0, uart_ms(r.s.uart_bytes) / 1000.0,
-                   r.known_path, r.true_path, good ? "ok" : (r.center ? "no-return" : "no-centre"));
+                   r.known_path, r.true_path, r.speed_cells,
+                   good ? "ok" : !r.center ? "no-centre" : !r.home ? "no-return" : "speed-run");
     }
     total -= skipped;
     if (total == 0) return 1;
-    printf("mazes=%d ok=%d crashes=%d | mean per maze: cells=%.1f turns90=%.1f turns180=%.1f "
+    printf("mazes=%d ok=%d crashes=%d speed_run_optimal=%d/%d | mean per maze: cells=%.1f turns90=%.1f turns180=%.1f "
            "delay_s=%.1f uart_s=%.1f known_path_excess=%.2f\n",
-           total, ok, crashes, sum_cells / total, sum_t90 / total, sum_t180 / total,
+           total, ok, crashes, speed_ok, solvable, sum_cells / total, sum_t90 / total, sum_t180 / total,
            sum_delay / total, sum_uart / total, gap_n ? sum_gap / gap_n : -1.0);
     return ok == total ? 0 : 1;
 }

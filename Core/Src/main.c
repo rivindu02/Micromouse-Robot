@@ -341,8 +341,12 @@ int main(void)
 			run_maze_exploration_sequence();
 
 		} else if (is_exploration_complete()) {
-			send_bluetooth_message("\r\n🏁 EXPLORATION COMPLETE - Ready for speed run! 🏁\r\n");
-			send_performance_metrics();
+			// Left button after exploration: shortest-path run from start.
+			// For a repeat run, carry the robot back to the start cell
+			// facing north, then press again.
+			play_confirmation_tone();
+			HAL_Delay(1000);
+			run_speed_run();
 
 		} else if (!system_ready) {
 			send_bluetooth_message("⚠️ System not ready - check diagnostics!\r\n");
